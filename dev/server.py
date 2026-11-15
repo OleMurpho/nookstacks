@@ -24,6 +24,8 @@ import os
 import shutil
 import sys
 import threading
+import io
+import zipfile
 import time
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -38,8 +40,23 @@ BACKUP = STATE + ".bak"
 KEEP_HISTORY = 40
 MAX_STATE = 64 * 1024 * 1024
 MAX_BLOB = 512 * 1024 * 1024
+MAX_BUNDLE = 1024 * 1024 * 1024
 
 lock = threading.Lock()
+
+
+def collect_blob_ids(node, found=None):
+    """Every blobId anywhere in a piece of state."""
+    found = set() if found is None else found
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "blobId" and isinstance(v, str) and v and "/" not in v and "\\" not in v:
+                found.add(v)
+            collect_blob_ids(v, found)
+    elif isinstance(node, list):
+        for v in node:
+            collect_blob_ids(v, found)
+    return found
 
 
 def ensure_dirs():
@@ -150,6 +167,78 @@ class Handler(SimpleHTTPRequestHandler):
         if self._path_is_api():
             return self._json({"ok": False, "error": "unknown"}, 404)
         return super().do_GET()
+
+    def do_POST(self):
+        """The same two bundle operations the desktop shell does in Rust."""
+        if self.path == "/api/export":
+            raw = self._body(MAX_STATE)
+            if raw is None:
+                return
+            try:
+                payload = json.loads(raw.decode("utf-8"))
+                state = payload["state"]
+                scope = payload.get("scope", "board")
+                name = (payload.get("name") or "board").strip() or "board"
+            except Exception as e:
+                return self._json({"ok": False, "error": f"bad export request: {e}"}, 400)
+
+            ids = sorted(collect_blob_ids(state))
+            manifest = {
+                "format": "nookstacks.bundle", "version": 1, "app": "0.1.0",
+                "scope": scope, "name": name,
+                "exported_ms": int(time.time() * 1000), "blobs": ids,
+            }
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+                z.writestr("nookstacks.json", json.dumps(manifest, indent=2))
+                z.writestr("state.json", json.dumps(state))
+                for bid in ids:
+                    fp = os.path.join(BLOBS, bid)
+                    if os.path.isfile(fp):
+                        z.write(fp, f"blobs/{bid}", compress_type=zipfile.ZIP_STORED)
+            data = buf.getvalue()
+            safe = "".join(c if (c.isalnum() or c in " -_") else "-" for c in name).strip() or "board"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("X-Bundle-Name", safe)
+            self.send_header("Content-Disposition", f'attachment; filename="{safe}.nks"')
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
+        if self.path == "/api/import":
+            raw = self._body(MAX_BUNDLE)
+            if raw is None:
+                return
+            try:
+                with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                    manifest = json.loads(z.read("nookstacks.json").decode("utf-8"))
+                    state = json.loads(z.read("state.json").decode("utf-8"))
+                    if manifest.get("format") != "nookstacks.bundle":
+                        raise ValueError("not a Nookstacks bundle")
+                    if int(manifest.get("version", 0)) > 1:
+                        raise ValueError("bundle was written by a newer Nookstacks")
+                    ensure_dirs()
+                    added = 0
+                    for name in z.namelist():
+                        if not name.startswith("blobs/"):
+                            continue
+                        bid = name[len("blobs/"):]
+                        if not bid or "/" in bid or "\\" in bid or ".." in bid:
+                            continue
+                        dest = os.path.join(BLOBS, bid)
+                        if os.path.exists(dest):
+                            continue
+                        atomic_write(dest, z.read(name))
+                        added += 1
+            except KeyError as e:
+                return self._json({"ok": False, "error": f"missing {e} in bundle"}, 400)
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 400)
+            return self._json({"ok": True, "manifest": manifest, "state": state, "blobs_added": added})
+
+        return self._json({"ok": False, "error": "unknown"}, 404)
 
     def do_PUT(self):
         if self.path == "/api/state":

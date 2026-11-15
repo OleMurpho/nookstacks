@@ -4,6 +4,7 @@
 // replaces the HTTP API with direct file access. All file system work lives in
 // `vault`, which is unit-tested without a window.
 
+mod nks;
 mod vault;
 
 use serde::Serialize;
@@ -97,6 +98,58 @@ fn open_vault() -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn export_nks(state: serde_json::Value, scope: String, name: String) -> Result<nks::Written, String> {
+    let safe: String = name
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '-' })
+        .collect();
+    let suggested = format!("{}.nks", if safe.trim().is_empty() { "board".into() } else { safe.trim().to_string() });
+    let out = rfd::FileDialog::new()
+        .set_title("Export board as .nks")
+        .add_filter("Nookstacks bundle", &["nks"])
+        .set_file_name(&suggested)
+        .save_file()
+        .ok_or("cancelled")?;
+    let blobs = vault::current().blobs_dir();
+    nks::write_nks(&blobs, &state, &scope, &name, &out)
+}
+
+#[tauri::command]
+fn import_nks() -> Result<nks::Incoming, String> {
+    let picked = rfd::FileDialog::new()
+        .set_title("Open a .nks board")
+        .add_filter("Nookstacks bundle", &["nks"])
+        .pick_file()
+        .ok_or("cancelled")?;
+    let blobs = vault::current().blobs_dir();
+    vault::current().ensure_dirs().map_err(|e| e.to_string())?;
+    nks::read_nks(&blobs, &picked)
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("only http(s) links can be opened".into());
+    }
+    #[cfg(target_os = "windows")]
+    let how = ("cmd", vec!["/C", "start", "", &url]);
+    #[cfg(target_os = "macos")]
+    let how = ("open", vec![url.as_str()]);
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    let how = ("xdg-open", vec![url.as_str()]);
+    std::process::Command::new(how.0)
+        .args(how.1)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = vault::current().ensure_dirs();
@@ -128,7 +181,11 @@ pub fn run() {
             delete_blob,
             import_files,
             pick_files,
-            open_vault
+            open_vault,
+            export_nks,
+            import_nks,
+            open_url,
+            quit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running Nookstacks");

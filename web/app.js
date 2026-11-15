@@ -147,7 +147,48 @@ const vault = {
   /* desktop only: native picker and path import (no bytes through JS) */
   async pick(){ return DESKTOP ? call('pick_files') : null; },
   async importPaths(paths){ return DESKTOP ? call('import_files', {paths}) : []; },
-  async openFolder(){ if (DESKTOP) call('open_vault'); }
+  async openFolder(){ if (DESKTOP) call('open_vault'); },
+
+  /* .nks bundles: one file for one board, or for the whole tower */
+  async exportBundle(state, scope, name){
+    if (DESKTOP){
+      try {
+        return await call('export_nks', { state, scope, name });
+      } catch (e){
+        if (String(e).includes('cancelled')) return { cancelled: true };
+        throw e;
+      }
+    }
+    const r = await fetch('/api/export', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({ state, scope, name }) });
+    if (!r.ok) throw new Error('export ' + r.status);
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (r.headers.get('X-Bundle-Name') || name || 'board') + '.nks';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    return { bytes: blob.size, path: a.download };
+  },
+
+  async importBundle(){
+    let bytes = null, label = '';
+    if (DESKTOP){
+      try { return await call('import_nks'); }
+      catch (e){ if (String(e).includes('cancelled')) return null; throw e; }
+    }
+    bytes = await new Promise(resolve => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = '.nks';
+      inp.onchange = async () => resolve(inp.files[0] ? { file: inp.files[0] } : null);
+      inp.click();
+    });
+    if (!bytes) return null;
+    const r = await fetch('/api/import', { method:'POST', headers:{'Content-Type':'application/octet-stream'},
+      body: bytes.file });
+    if (!r.ok) throw new Error('import ' + r.status);
+    return await r.json();
+  }
 };
 
 let db = seed();
@@ -977,6 +1018,29 @@ addEventListener('keydown', e => {
     case 'f': case 'F': e.preventDefault(); fitView(); break;
     case 'g': case 'G': e.preventDefault(); toggleDraw(); break;
     case 's': case 'S': e.preventDefault(); openSettings(); break;
+    case '?': e.preventDefault(); showShortcuts(); break;
+    case ']': if (selected){ e.preventDefault(); bringToFront(); } break;
+    case '[': if (selected){ e.preventDefault(); sendToBack(); } break;
+    case 'c': case 'C': if (selected){ e.preventDefault(); centreSelection(); } break;
+    case 'F2': e.preventDefault(); renameCurrent('project'); break;
+    case 'd': case 'D':
+      if (e.ctrlKey || e.metaKey){ e.preventDefault(); duplicateSelected(); }
+      break;
+    case 'o': case 'O':
+      if (e.ctrlKey || e.metaKey){ e.preventDefault(); importNks(); }
+      break;
+    case 'e': case 'E':
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey){ e.preventDefault(); exportNks('board'); }
+      break;
+    case '=': case '+':
+      if (e.ctrlKey || e.metaKey){ e.preventDefault(); zoomBy(1.25); }
+      break;
+    case '-':
+      if (e.ctrlKey || e.metaKey){ e.preventDefault(); zoomBy(0.8); }
+      break;
+    case '0':
+      if (e.ctrlKey || e.metaKey){ e.preventDefault(); zoomActual(); }
+      break;
     case 'Delete': case 'Backspace': if (selected){ e.preventDefault(); removeDoc(selected); } break;
   }
 });
@@ -1181,3 +1245,395 @@ window.__nookstacks = { get db(){ return db; }, addFiles, place, removeDoc, DBG,
 
 /* go: read the vault, then draw */
 boot();
+
+
+/* ------------------------------------------------------------ menu bar */
+/* One definition drives the bar, the dropdowns, the shortcuts and the About
+   sheet. Adding a command means adding a row here. */
+
+const APP_VERSION = '0.1.0';
+
+function zoomBy(f){
+  cam.z = Math.min(4, Math.max(0.25, cam.z * f));
+  stash(); applyCam();
+}
+function zoomActual(){ cam = { ...cam, z: 1 }; stash(); applyCam(); }
+
+function duplicateSelected(){
+  if (!selected) return;
+  const s = curShelf();
+  const src = s.docs.find(d => d.id === selected);
+  if (!src) return;
+  const copy = JSON.parse(JSON.stringify(src));
+  copy.id = 'o' + Math.random().toString(36).slice(2, 9);
+  copy.x += 28; copy.y += 28;
+  copy.title = src.title.replace(/(\scopy)?$/, ' copy');
+  copy.blobId = src.blobId;          // content-addressed, so sharing is safe
+  s.docs.push(copy);
+  save(); render(); select(copy.id);
+}
+
+function bringToFront(){
+  if (!selected) return;
+  const s = curShelf(); const i = s.docs.findIndex(d => d.id === selected);
+  if (i < 0) return;
+  const [d] = s.docs.splice(i, 1); s.docs.push(d);
+  save(); render(); select(d.id);
+}
+function sendToBack(){
+  if (!selected) return;
+  const s = curShelf(); const i = s.docs.findIndex(d => d.id === selected);
+  if (i < 0) return;
+  const [d] = s.docs.splice(i, 1); s.docs.unshift(d);
+  save(); render(); select(d.id);
+}
+
+/* lay the board out as columns, left to right, top to bottom */
+function tidyBoard(){
+  const s = curShelf();
+  if (!s.docs.length) return;
+  const gapX = 28, gapY = 24, top = 90;
+  const cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(s.docs.length))));
+  const colW = 380;
+  const heights = new Array(cols).fill(top);
+  s.docs.forEach((d, i) => {
+    const col = i % cols;
+    d.x = 60 + col * (colW + gapX);
+    d.y = heights[col];
+    heights[col] += (d.h || 200) + gapY;
+  });
+  save(); render(); fitView();
+}
+
+function renameCurrent(what){
+  const kind = what === 'project' ? 'proj' : 'cat';
+  const i = what === 'project' ? shelf : level;
+  const row = document.querySelector(`#${what === 'project' ? 'projList' : 'catList'} .ritem[data-i="${i}"]`);
+  if (row) startRename(row, kind, i);
+}
+
+function copyVaultPath(){
+  const p = (DESKTOP && vault.path) ? vault.path : '(browser build: the dev server keeps the vault)';
+  navigator.clipboard.writeText(p).then(
+    () => setSaveState('vault path copied', 'ok'),
+    () => alert(p)
+  );
+}
+
+function boardInfo(){
+  const docs = db.levels.reduce((n, l) => n + l.shelves.reduce((m, s) => m + s.docs.length, 0), 0);
+  const blobs = db.levels.reduce((n, l) => n + l.shelves.reduce((m, s) =>
+    m + s.docs.filter(d => d.blobId).length, 0), 0);
+  alert(
+    'Nookstacks ' + APP_VERSION + '\n\n' +
+    db.levels.length + ' categories, ' +
+    db.levels.reduce((n, l) => n + l.shelves.length, 0) + ' projects\n' +
+    docs + ' documents on ' + docs + ' cards (' + blobs + ' with attached files)\n\n' +
+    'Vault: ' + (DESKTOP && vault.path ? vault.path : 'browser (dev server)')
+  );
+}
+
+/* ---- .nks bundles ---------------------------------------------------- */
+function nksName(){ return (curShelf() && curShelf().name) || 'board'; }
+
+async function exportNks(scope){
+  try {
+    setSaveState('packing .nks…', 'busy');
+    let payload, name;
+    if (scope === 'board'){
+      // the exported file carries one project, at its own camera position
+      payload = { settings: db.settings, levels: [{
+        id: curLevel().id, name: curLevel().name,
+        shelves: [JSON.parse(JSON.stringify(curShelf()))]
+      }]};
+      name = nksName();
+    } else {
+      payload = JSON.parse(JSON.stringify(db));
+      name = 'all projects';
+    }
+    const res = await vault.exportBundle(payload, scope, name);
+    if (res && res.cancelled) { setSaveState('export cancelled', 'bad'); return; }
+    setSaveState('exported ' + (res.bytes ? Math.round(res.bytes / 1024) + ' KB' : ''), 'ok');
+    if (res.path) $('#saveState').title = res.path;
+  } catch (e){
+    note('errors', e);
+    setSaveState('export failed — ' + (e.message || e), 'bad');
+  }
+}
+
+/* Import a bundle as a new project (board) or replace the tower (vault). */
+async function importNks(){
+  try {
+    const res = await vault.importBundle();
+    if (!res) { setSaveState('import cancelled', 'bad'); return; }
+    const m = res.manifest || {};
+    if (m.scope === 'vault'){
+      if (!confirm('This bundle contains every project (' + (res.state.levels || []).length + ' categories).\n\nImporting replaces the tower you have open now. Your current board is kept in the vault history.\n\nContinue?')) return;
+      db.levels = res.state.levels || db.levels;
+      if (res.state.settings) db.settings = { ...db.settings, ...res.state.settings };
+      level = 0; shelf = 0; cam = { ...(curShelf().pan || { x:0, y:0, z:1 }) };
+      applySettings(); save(); render(); fitView();
+      setSaveState('imported ' + db.levels.length + ' categories', 'ok');
+      return;
+    }
+    // a single board arrives as a new project on the current shelf row
+    const inShelf = res.state.levels?.[0]?.shelves?.[0];
+    if (!inShelf) throw new Error('bundle has no board in it');
+    const names = curLevel().shelves.map(s => s.name);
+    let name = inShelf.name || 'Imported board';
+    if (names.includes(name)) name = name + ' (imported)';
+    const fresh = JSON.parse(JSON.stringify(inShelf));
+    fresh.id = 's' + Math.random().toString(36).slice(2, 8);
+    fresh.name = name;
+    (fresh.docs || []).forEach(d => { d.id = 'o' + Math.random().toString(36).slice(2, 9); });
+    fresh.pan = { x: 0, y: 0, z: 1 };
+    curLevel().shelves.push(fresh);
+    save(); render();
+    shelf = curLevel().shelves.length - 1; cam = { ...fresh.pan }; render(); fitView();
+    setSaveState('imported “' + name + '”', 'ok');
+  } catch (e){
+    note('errors', e);
+    setSaveState('import failed — ' + (e.message || e), 'bad');
+  }
+}
+
+/* ---- settings as a file ---------------------------------------------- */
+function exportSettings(){
+  const blob = new Blob([JSON.stringify({ format: 'nookstacks.settings', version: 1, settings: settings() }, null, 2)],
+    { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'nookstacks-settings.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function importSettings(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    try {
+      const j = JSON.parse(await f.text());
+      if (!j || !j.settings) throw new Error('no settings in that file');
+      db.settings = { ...DEFAULT_SETTINGS, ...j.settings };
+      applySettings(); save();
+      setSaveState('settings imported', 'ok');
+    } catch (e){ setSaveState('settings import failed', 'bad'); note('errors', e); }
+  };
+  inp.click();
+}
+
+/* ---- overlays --------------------------------------------------------- */
+function sheet(html){
+  let el = document.getElementById('sheet');
+  if (!el){
+    el = document.createElement('div'); el.id = 'sheet';
+    el.innerHTML = '<div class="card"></div>';
+    el.addEventListener('click', e => { if (e.target === el) closeSheet(); });
+    document.body.appendChild(el);
+  }
+  el.querySelector('.card').innerHTML = html;
+  el.hidden = false;
+}
+function closeSheet(){ const el = document.getElementById('sheet'); if (el) el.hidden = true; }
+
+const KEYS = [
+  ['↑ ↓', 'previous / next category'],
+  ['← →', 'previous / next project'],
+  ['N', 'new note'], ['T', 'new document'],
+  ['G', 'draw a region'], ['F', 'fit the board'],
+  ['S', 'settings'], ['Esc', 'close, cancel, deselect'],
+  ['Del', 'delete selection'],
+  ['Ctrl+D', 'duplicate selection'],
+  ['Ctrl++', 'zoom in'], ['Ctrl+−', 'zoom out'], ['Ctrl+0', 'actual size'],
+  ['[ ]', 'send to back / bring to front'],
+  ['F2', 'rename project'],
+  ['Ctrl+Shift+E', 'export this board as .nks'],
+  ['Ctrl+O', 'open a .nks board'],
+  ['Alt+F', 'open a menu with the keyboard'],
+  ['double-click', 'edit a note or rename a region'],
+  ['right-drag', 'pan the board'], ['wheel', 'zoom']
+];
+function showShortcuts(){
+  sheet('<h3>Keyboard</h3><table>' + KEYS.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('') + '</table>');
+}
+function showAbout(){
+  sheet(`<h3>About</h3><div class="about">
+    <p><b>Nookstacks</b> — a tower of project bookshelves. Every category is a level, every project a shelf,
+    every shelf an infinite board.</p>
+    <p>Local only: no account, no sync service, no telemetry. Your board is a folder you own.</p>
+    <p class="ver">version ${APP_VERSION} · MIT licence</p></div>`);
+}
+
+/* ---- the menu itself -------------------------------------------------- */
+const MENUS = [
+  { label: 'File', items: [
+    { label: 'New note', key: 'N', run: () => newNote() },
+    { label: 'New document', key: 'T', run: () => newText() },
+    { sep: true },
+    { label: 'Import files…', key: 'I', run: () => DESKTOP ? desktopImport() : $('#fileinput').click() },
+    { label: 'Place from URL…', run: () => addUrl() },
+    { sep: true },
+    { label: 'Open board…', key: 'Ctrl+O', run: () => importNks() },
+    { label: 'Export this board…', key: 'Ctrl+Shift+E', run: () => exportNks('board') },
+    { label: 'Export all projects…', run: () => exportNks('vault') },
+    { sep: true },
+    { label: 'Quit', key: 'Ctrl+Q', run: () => { if (DESKTOP) call('quit_app', {}); else window.close(); } }
+  ]},
+  { label: 'Edit', items: [
+    { label: 'Duplicate', key: 'Ctrl+D', run: () => duplicateSelected(), need: 'selection' },
+    { label: 'Delete', key: 'Del', run: () => selected && removeDoc(selected), need: 'selection' },
+    { sep: true },
+    { label: 'Rename project', key: 'F2', run: () => renameCurrent('project') },
+    { label: 'Rename category', run: () => renameCurrent('category') }
+  ]},
+  { label: 'Preferences', items: [
+    { label: 'Preferences…', key: 'S', run: () => openSettings() },
+    { sep: true },
+    { title: 'Theme' },
+    ...THEMES.map(t => ({ label: t.name, check: () => settings().theme === t.id,
+        run: () => { settings().theme = t.id; applySettings(); save(); } })),
+    { sep: true },
+    { title: 'Text size' },
+    ...[['compact','Small'],['regular','Normal'],['large','Large']].map(([v, n]) => ({
+        label: n, check: () => settings().size === v, run: () => setSetting('size', v) })),
+    { sep: true },
+    { label: 'Export settings…', run: () => exportSettings() },
+    { label: 'Import settings…', run: () => importSettings() }
+  ]},
+  { label: 'View', items: [
+    { label: 'Fit board', key: 'F', run: () => fitView() },
+    { label: 'Zoom in', key: 'Ctrl++', run: () => zoomBy(1.25) },
+    { label: 'Zoom out', key: 'Ctrl+−', run: () => zoomBy(0.8) },
+    { label: 'Actual size', key: 'Ctrl+0', run: () => zoomActual() },
+    { sep: true },
+    { label: 'Board grid', check: () => settings().grid === 'on',
+      run: () => setSetting('grid', settings().grid === 'on' ? 'off' : 'on') },
+    { label: 'Reduce motion', check: () => settings().motion === 'reduce',
+      run: () => setSetting('motion', settings().motion === 'reduce' ? 'full' : 'reduce') },
+    { label: 'Show sidebar', check: () => !document.body.classList.contains('norail'),
+      run: () => { document.body.classList.toggle('norail');
+        const on = !document.body.classList.contains('norail');
+        document.getElementById('rail').style.display = on ? '' : 'none';
+        applyCam(); } }
+  ]},
+  { label: 'Arrange', items: [
+    { label: 'Bring to front', key: ']', run: () => bringToFront(), need: 'selection' },
+    { label: 'Send to back', key: '[', run: () => sendToBack(), need: 'selection' },
+    { sep: true },
+    { label: 'Tidy board', run: () => tidyBoard() },
+    { label: 'Centre selection', key: 'C', run: () => centreSelection(), need: 'selection' }
+  ]},
+  { label: 'Extras', items: [
+    { label: 'Open vault folder', run: () => DESKTOP ? call('open_vault', {}).catch(e => note('errors', e))
+        : alert('Browser build: the vault is the dev server’s folder.') },
+    { label: 'Copy vault path', run: () => copyVaultPath() },
+    { sep: true },
+    { label: 'Board info…', run: () => boardInfo() }
+  ]},
+  { label: 'Help', items: [
+    { label: 'Keyboard shortcuts', key: '?', run: () => showShortcuts() },
+    { label: 'README on GitHub', run: () => openExternal('https://github.com/OleMurpho/nookstacks#readme') },
+    { sep: true },
+    { label: 'About Nookstacks', run: () => showAbout() }
+  ]}
+];
+
+function openExternal(url){
+  if (DESKTOP) call('open_url', { url }).catch(() => window.open(url, '_blank'));
+  else window.open(url, '_blank', 'noopener');
+}
+
+function centreSelection(){
+  if (!selected) return;
+  const d = curShelf().docs.find(x => x.id === selected);
+  if (!d) return;
+  cam.x = -(d.x + d.w / 2 - SW / 2);
+  cam.y = -(d.y + d.h / 2 - SH / 2);
+  stash(); applyCam();
+}
+
+let mbOpen = null;
+function focusRow(i){
+  if (!mbOpen) return;
+  const rows = [...mbOpen.querySelectorAll('.mb-row:not(.disabled)')];
+  rows.forEach(r => r.classList.remove('kb'));
+  const row = rows[i];
+  if (row){ row.classList.add('kb'); row.scrollIntoView({ block:'nearest' }); }
+}
+function closeMenus(){
+  document.querySelectorAll('.mb-item.open').forEach(el => { el.classList.remove('open'); el.querySelector('.mb-drop').hidden = true; });
+  mbOpen = null;
+}
+function openMenu(itemEl, keep){
+  const drop = itemEl.querySelector('.mb-drop');
+  const wasOpen = !drop.hidden;
+  closeMenus();
+  if (wasOpen && keep) return;
+  // rebuild on open so checkmarks reflect current state
+  drop.innerHTML = '';
+  const def = MENUS.find(m => m.label === itemEl.dataset.menu);
+  def.items.forEach(it => {
+    if (it.sep){ const s = document.createElement('div'); s.className = 'mb-sep'; drop.appendChild(s); return; }
+    if (it.title){ const t = document.createElement('div'); t.className = 'mb-title'; t.textContent = it.title; drop.appendChild(t); return; }
+    const row = document.createElement('div');
+    row.className = 'mb-row';
+    if (it.need === 'selection' && !selected) row.classList.add('disabled');
+    const check = it.check ? (it.check() ? '✓' : '') : '';
+    row.innerHTML = `<span class="mb-check">${check}</span><span>${esc(it.label)}</span>` +
+      (it.key ? `<span class="mb-key">${esc(it.key)}</span>` : '');
+    row.onclick = () => { closeMenus(); it.run(); };
+    drop.appendChild(row);
+  });
+  drop.hidden = false;
+  itemEl.classList.add('open');
+  mbOpen = itemEl;
+}
+
+function buildMenus(){
+  const nav = document.getElementById('mb-menus');
+  MENUS.forEach(m => {
+    const item = document.createElement('div');
+    item.className = 'mb-item'; item.dataset.menu = m.label;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.textContent = m.label;
+    const drop = document.createElement('div');
+    drop.className = 'mb-drop'; drop.hidden = true;
+    btn.onclick = e => { e.stopPropagation(); openMenu(item, true); };
+    btn.onmouseenter = () => { if (mbOpen && mbOpen !== item) openMenu(item, false); };
+    item.appendChild(btn); item.appendChild(drop);
+    nav.appendChild(item);
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('#menubar')) closeMenus(); });
+
+  // desktop convention: Alt+letter opens a menu, arrows walk it, Enter runs
+  addEventListener('keydown', e => {
+    if (e.altKey && !e.ctrlKey && !e.metaKey){
+      const letter = (e.key || '').toLowerCase();
+      const item = [...document.querySelectorAll('.mb-item')].find(i => i.dataset.menu[0].toLowerCase() === letter);
+      if (item){ e.preventDefault(); openMenu(item, false); focusRow(0); }
+      return;
+    }
+    if (!mbOpen) return;
+    const rows = [...mbOpen.querySelectorAll('.mb-row:not(.disabled)')];
+    if (!rows.length) return;
+    const at = rows.findIndex(r => r.classList.contains('kb'));
+    if (e.key === 'ArrowDown'){ e.preventDefault(); focusRow(Math.min(rows.length - 1, at + 1)); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); focusRow(Math.max(0, at - 1)); }
+    else if (e.key === 'Enter' || e.key === ' '){
+      if (at >= 0){ e.preventDefault(); rows[at].click(); }
+    }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
+      e.preventDefault();
+      const all = [...document.querySelectorAll('.mb-item')];
+      const i = all.indexOf(mbOpen);
+      const next = all[(i + (e.key === 'ArrowRight' ? 1 : all.length - 1)) % all.length];
+      openMenu(next, false); focusRow(0);
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape'){ closeMenus(); closeSheet(); }
+  });
+}
+buildMenus();
+window.__nookstacksMenu = { menus: MENUS, open: () => mbOpen, exportNks, importNks, tidyBoard, showShortcuts, showAbout };

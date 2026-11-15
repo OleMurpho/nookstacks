@@ -58,6 +58,40 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 
 Regions get moved by their label, resized by their corner handles, renamed by double-clicking the label, and deleted with the ✕ inside it.
 
+## The menu bar
+
+File, Edit, Preferences, View, Arrange, Extras and Help, along the top of the window — `Alt` + the first letter opens one, arrows walk it, `Enter` runs it.
+
+- **File** — new note or document, import files, place from a URL, open a `.nks` board, export this board or the whole tower, quit
+- **Edit** — duplicate, delete, rename the project or the category
+- **Preferences** — preferences panel, theme, text size, export/import settings
+- **View** — fit, zoom in/out/actual size, board grid, reduce motion, show sidebar
+- **Arrange** — bring to front, send to back, tidy the board into columns, centre the selection
+- **Extras** — open or copy the vault path, board info
+- **Help** — keyboard shortcuts, README, about
+
+![The File menu](docs/menu-file.png)
+
+## Boards as files: `.nks`
+
+A `.nks` file is one board, or the whole tower, in a single file you can email, back up or carry between machines.
+
+**File → Export this board…** (`Ctrl+Shift+E`) writes a bundle of the project you're on: its regions, its documents, and every file attached to them. **File → Export all projects…** does the same for everything.
+
+**File → Open board…** (`Ctrl+O`) reads one back. A single board arrives as a new project beside the one you're on; a whole-tower bundle asks first, then replaces what's open (your previous state stays in `vault/history`).
+
+Under the hood it's a zip:
+
+```
+nookstacks.json     format id, version, scope, name, which blobs are inside
+state.json          the board itself
+blobs/<hash>        every attached file, addressed by content hash
+```
+
+Blobs are keyed by hash and nothing in the state is an absolute path, so a board exported on Windows opens on Linux with nothing to relink. Importing twice does not duplicate the attached files, and a bundle from a newer Nookstacks is refused rather than half-read.
+
+**Preferences → Export settings… / Import settings…** does the same for just your preferences, as a small JSON file.
+
 ## Settings and themes
 
 Click **⚙ Settings** at the bottom of the sidebar, or press `S`.
