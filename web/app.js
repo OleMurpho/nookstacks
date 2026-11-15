@@ -1224,8 +1224,14 @@ if (DESKTOP && TAURI.event){
       window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
       return;
     }
-    // chrome that owns its own gesture (card header, resize handle, close, field, rail)
-    const owned = e.target.closest('.obj .head, .obj .h, .obj .close, input, textarea, .navarrow, #rail, canvas.mesh');
+    // chrome that owns its own gesture (card header, resize handle, close, field,
+    // rail, and the whole top strip). A toolbar button used to fall through to
+    // here: the press started a pan, which cleared the selection, so Delete had
+    // nothing to delete and the board stayed locked to the cursor.
+    const owned = e.target.closest(
+      '.obj .head, .obj .h, .obj .close, input, textarea, select, button, .navarrow,' +
+      ' #rail, #topbar, .tb-tools, #menubar, .mb-drop, #settings, .drawer, #sheet,' +
+      ' canvas.mesh, a[href]');
     if (e.button === 0 && owned) return;
     note('down');
     down = true; sx = e.clientX; sy = e.clientY; ox = cam.x; oy = cam.y;
@@ -1237,6 +1243,8 @@ if (DESKTOP && TAURI.event){
   const move = e => {
     note('move');
     if (!down) return;
+    // self-heal a missed mouseup: no buttons held means the gesture is over
+    if (e.buttons === 0){ end(); return; }
     pending = e;
     if (frame) return;
     frame = requestAnimationFrame(() => {
