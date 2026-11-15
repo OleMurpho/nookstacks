@@ -50,6 +50,8 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 | `N` | new note where the cursor is |
 | `G` | draw a region around things |
 | `S` | open settings |
+| `Ctrl+Z` / `Ctrl+Shift+Z` | undo / redo (80 steps) |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy, cut, paste the selected card |
 | `Esc` | close the settings panel, cancel a region, deselect |
 | double-click a note | edit it, click away to save |
 | right-drag | pan the board |
@@ -66,7 +68,7 @@ File, Edit, Preferences, View, Arrange, Extras and Help, along the top of the wi
 - **Edit** — duplicate, delete, rename the project or the category
 - **Preferences** — preferences panel, theme, text size, export/import settings
 - **View** — fit, zoom in/out/actual size, board grid, reduce motion, show sidebar
-- **Arrange** — bring to front, send to back, tidy the board into columns, centre the selection
+- **Arrange** — bring to front, send to back, tidy the board, centre the selection
 - **Extras** — open or copy the vault path, board info
 - **Help** — keyboard shortcuts, README, about
 
@@ -110,6 +112,12 @@ Click **⚙ Settings** at the bottom of the sidebar, or press `S`.
 **Board grid** — turn the dotted grid off for a cleaner canvas.
 
 **Reduce motion** — disables board travel animation and zooming transitions. The app also honours your system's reduced-motion preference when this is left at Off.
+
+**Fit** frames every card and region on the shelf, however far it sits from the centre — park something 5000 px away and Fit zooms out until it is on screen too.
+
+**Tidy board** packs the shelf into balanced columns using each card's real width and height, and treats a region as one unit: its cards stack inside it and the region is measured to wrap them, so tidying cannot leave a card half in and half out. Shortest column wins, and the order the cards already read in is kept.
+
+**Undo** keeps the last 80 states of the board, so a tidy, a drag or a deletion is one `Ctrl+Z` away; typing in a note is coalesced into a single step. Copy and paste work on cards, and a pasted card shares the underlying file rather than duplicating it.
 
 **Board data → Open folder** — opens the vault directory in your file manager, so backups are one click away.
 

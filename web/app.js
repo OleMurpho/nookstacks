@@ -265,6 +265,7 @@ const curShelf = () => curLevel().shelves[shelf];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function save(){
+  histPush();
   // mirror locally first: even if the server write fails, this tab keeps working
   try { localStorage.setItem(LKEY, JSON.stringify(db)); } catch {}
   if (!storeReady) { dirtyAfterBoot = true; return; }
@@ -874,7 +875,11 @@ function removeDoc(id){
   const i = s.docs.findIndex(d => d.id === id);
   if (i < 0) return;
   const [doc] = s.docs.splice(i, 1);
-  if (doc.blobId){ idb.del(doc.blobId); vault.delBlob(doc.blobId); }
+  if (doc.blobId){
+    // a duplicated or pasted card shares the same content-addressed blob
+    const stillUsed = db.levels.some(l => l.shelves.some(sh => sh.docs.some(d => d.blobId === doc.blobId)));
+    if (!stillUsed){ idb.del(doc.blobId); vault.delBlob(doc.blobId); }
+  }
   if (urls.has(doc.id)){ URL.revokeObjectURL(urls.get(doc.id)); urls.delete(doc.id); }
   if (selected === id) selected = null;
   save(); render();
@@ -988,7 +993,34 @@ function goLevel(i){
     w.style.opacity = '1';
   }, 240);
 }
-function fitView(){ cam = { x:0, y:0, z:1 }; stash(); applyCam(); }
+/* Every card and region on the shelf, as one rectangle. */
+function contentBounds(){
+  const s = curShelf();
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const add = (x, y, w, h) => {
+    if (![x, y, w, h].every(Number.isFinite)) return;
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y);
+    x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h);
+  };
+  (s.docs || []).forEach(d => add(d.x, d.y, d.w || 300, d.h || 200));
+  (s.groups || []).forEach(g => add(g.x, g.y, g.w, g.h));
+  return Number.isFinite(x0) ? { x0, y0, x1, y1 } : null;
+}
+
+/* Fit means: every element on screen, whatever its distance from the centre. */
+function fitView(pad = 88){
+  const b = contentBounds();
+  if (!b){ cam = { x:0, y:0, z:1 }; stash(); applyCam(); return; }
+  const availW = Math.max(240, innerWidth - RAILW - pad * 2);
+  const availH = Math.max(180, innerHeight - 34 - pad * 2);
+  const w = Math.max(1, b.x1 - b.x0), h = Math.max(1, b.y1 - b.y0);
+  // never magnify past 1.5x world scale — a single card should not fill the screen
+  const zAbs = Math.min(availW / w, availH / h, 1.5);
+  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+  // screen = midX + z * (world - SW/2 - cam.x), so the bbox centre lands at midX
+  cam = { z: zAbs / fitZoom(), x: cx - SW / 2, y: cy - SH / 2 };
+  stash(); applyCam();
+}
 
 function toggleDraw(on){
   drawMode = (on === undefined) ? !drawMode : !!on;
@@ -1008,6 +1040,15 @@ addEventListener('keydown', e => {
   }
   if (settingsOpen()) return;
   if (typing) return;
+  if ((e.ctrlKey || e.metaKey) && !e.altKey){
+    const k = (e.key || '').toLowerCase();
+    if (k === 'z' && !e.shiftKey){ e.preventDefault(); undo(); return; }
+    if ((k === 'z' && e.shiftKey) || k === 'y'){ e.preventDefault(); redo(); return; }
+    if (k === 'c' && selected){ e.preventDefault(); copySelection(); return; }
+    if (k === 'x' && selected){ e.preventDefault(); cutSelection(); return; }
+    if (k === 'v' && CLIP){ e.preventDefault(); pasteClipboard(); return; }
+    if (k === 'a'){ e.preventDefault(); return; }
+  }
   switch (e.key){
     case 'ArrowUp': e.preventDefault(); goLevel(level-1); break;
     case 'ArrowDown': e.preventDefault(); goLevel(level+1); break;
@@ -1241,9 +1282,93 @@ try { render(); } catch (e) {
   window.__err = e.message + '\n' + (e.stack || '');
   console.error(e);
 }
-window.__nookstacks = { get db(){ return db; }, addFiles, place, removeDoc, DBG, get cam(){ return { ...cam }; }, get state(){ return { level, shelf, selected, docs: curShelf().docs.length }; } };
+window.__nookstacks = { get db(){ return db; }, addFiles, place, removeDoc, DBG,
+  get cam(){ return { ...cam }; },
+  get state(){ return { level, shelf, selected, docs: curShelf().docs.length }; },
+  // test surface: drive layout and history without the mouse
+  fitView, tidyBoard, render, undo, redo, select, save,
+  get contentBounds(){ return contentBounds(); } };
 
 /* go: read the vault, then draw */
+/* ------------------------------------------------------------- undo / redo */
+/* Snapshots rather than command objects: the board is small JSON, and a
+   snapshot cannot get out of step with the state the way an inverse operation
+   can once a drag, a rename and a paste have been replayed in a new order. */
+const HIST = { past: [], future: [], last: '', t: 0, quiet: false };
+
+function histPush(){
+  if (HIST.quiet) return;
+  const s = JSON.stringify(db);
+  if (HIST.last === s) return;
+  const now = Date.now();
+  // a burst of typing is one undo step, not one per keystroke
+  if (now - HIST.t < 700 && HIST.past.length > 1) HIST.past[HIST.past.length - 1] = s;
+  else HIST.past.push(s);
+  if (HIST.past.length > 80) HIST.past.shift();
+  HIST.last = s; HIST.t = now; HIST.future.length = 0;
+  paintHistory();
+}
+
+function restore(json, label){
+  HIST.quiet = true;
+  db = JSON.parse(json);
+  HIST.last = json;
+  level = Math.max(0, Math.min(db.levels.length - 1, level));
+  shelf = Math.max(0, Math.min(curLevel().shelves.length - 1, shelf));
+  selected = null;
+  if (db.settings) applySettings();
+  renderRail(); render(); save();
+  HIST.quiet = false;
+  setSaveState(label, 'ok');
+  paintHistory();
+}
+
+function undo(){
+  if (HIST.past.length < 2){ setSaveState('nothing to undo', 'bad'); return; }
+  HIST.future.push(HIST.past.pop());
+  restore(HIST.past[HIST.past.length - 1], 'undo');
+}
+function redo(){
+  if (!HIST.future.length){ setSaveState('nothing to redo', 'bad'); return; }
+  const s = HIST.future.pop();
+  HIST.past.push(s);
+  restore(s, 'redo');
+}
+const canUndo = () => HIST.past.length > 1;
+const canRedo = () => HIST.future.length > 0;
+
+function paintHistory(){
+  const u = document.querySelector('[data-menu="Edit"]');
+  if (u) u.dataset.canUndo = canUndo() ? '1' : '';
+}
+
+/* ------------------------------------------------------------- clipboard */
+let CLIP = null;
+const canPaste = () => !!CLIP;
+
+function copySelection(){
+  const d = curShelf().docs.find(x => x.id === selected);
+  if (!d) return false;
+  CLIP = JSON.parse(JSON.stringify(d));
+  setSaveState('copied “' + d.title + '”', 'ok');
+  return true;
+}
+function cutSelection(){
+  if (!copySelection()) return;
+  removeDoc(selected);
+  setSaveState('cut', 'ok');
+}
+function pasteClipboard(){
+  if (!CLIP) return;
+  const d = JSON.parse(JSON.stringify(CLIP));
+  d.id = 'o' + Math.random().toString(36).slice(2, 9);
+  d.x = CLIP.x + 28; d.y = CLIP.y + 28;
+  CLIP.x = d.x; CLIP.y = d.y;          // walk the next paste a step further
+  if (d.title) d.title = d.title.replace(/(\scopy)?$/, ' copy');
+  curShelf().docs.push(d);
+  save(); render(); select(d.id);
+}
+
 boot();
 
 
@@ -1288,20 +1413,71 @@ function sendToBack(){
   save(); render(); select(d.id);
 }
 
-/* lay the board out as columns, left to right, top to bottom */
+/* Pack the board into balanced columns using each card's real size.
+   A region is a layout unit: its cards stack inside it and the region is
+   measured to wrap them, so tidying can never leave a card half outside a
+   region or let a wide card overlap its neighbour. */
 function tidyBoard(){
   const s = curShelf();
   if (!s.docs.length) return;
-  const gapX = 28, gapY = 24, top = 90;
-  const cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(s.docs.length))));
-  const colW = 380;
-  const heights = new Array(cols).fill(top);
-  s.docs.forEach((d, i) => {
-    const col = i % cols;
-    d.x = 60 + col * (colW + gapX);
-    d.y = heights[col];
-    heights[col] += (d.h || 200) + gapY;
+
+  const GAP_X = 40, GAP_Y = 36, ORIGIN = 90;
+  const PAD_X = 30, PAD_TOP = 54, PAD_BOT = 30, ROW_GAP = 26;
+  const W = d => Math.max(220, d.w || 300);
+  const H = d => Math.max(120, d.h || 200);
+
+  // 1. units: every region takes the cards that were inside it; the rest stand alone
+  const claimed = new Set();
+  const units = [];
+  (s.groups || []).forEach(g => {
+    const members = s.docs.filter(d => d.x + W(d) > g.x && d.x < g.x + g.w &&
+                                       d.y + H(d) > g.y && d.y < g.y + g.h);
+    members.forEach(d => claimed.add(d.id));
+    units.push({ g, cards: members });
   });
+  s.docs.filter(d => !claimed.has(d.id)).forEach(d => units.push({ g: null, cards: [d] }));
+  if (!units.length) return;
+
+  // 2. keep the order the board already reads in
+  const top = u => u.cards.length ? Math.min(...u.cards.map(d => d.y)) : u.g.y;
+  units.sort((a, b) => (top(a) - top(b)) || (a.cards[0]?.x ?? a.g.x) - (b.cards[0]?.x ?? b.g.x));
+
+  const unitW = u => u.g
+    ? Math.max(u.g.w, ...u.cards.map(d => W(d) + PAD_X * 2), 300)
+    : W(u.cards[0]);
+  const colW = Math.max(300, ...units.map(unitW));
+  const cols = Math.max(1, Math.min(4, Math.round(Math.sqrt(units.length))));
+  const colY = new Array(cols).fill(ORIGIN);
+
+  // 3. shortest column wins; each unit owns its column band outright
+  units.forEach(u => {
+    let c = 0;
+    for (let k = 1; k < cols; k++) if (colY[k] < colY[c] - 0.5) c = k;
+    const x = ORIGIN + c * (colW + GAP_X);
+
+    if (u.g){
+      const cards = u.cards;
+      // stack the members and centre each inside the region's inner width,
+      // so the padding reads even on both sides
+      const innerW = cards.length ? Math.max(...cards.map(W)) : 320;
+      let y = colY[c] + PAD_TOP;
+      cards.forEach(d => {
+        d.x = x + PAD_X + (innerW - W(d)) / 2;
+        d.y = y;
+        y += H(d) + ROW_GAP;
+      });
+      const bottom = cards.length ? y - ROW_GAP : colY[c] + 140;
+      u.g.x = x; u.g.y = colY[c];
+      u.g.w = Math.max(260, innerW + PAD_X * 2);
+      u.g.h = Math.max(120, (bottom - u.g.y) + PAD_BOT);
+      colY[c] = u.g.y + u.g.h + GAP_Y;
+    } else {
+      const d = u.cards[0];
+      d.x = x; d.y = colY[c];
+      colY[c] = d.y + H(d) + GAP_Y;
+    }
+  });
+
   save(); render(); fitView();
 }
 
@@ -1481,6 +1657,13 @@ const MENUS = [
     { label: 'Quit', key: 'Ctrl+Q', run: () => { if (DESKTOP) call('quit_app', {}); else window.close(); } }
   ]},
   { label: 'Edit', items: [
+    { label: 'Undo', key: 'Ctrl+Z', run: () => undo(), need: () => canUndo() },
+    { label: 'Redo', key: 'Ctrl+Shift+Z', run: () => redo(), need: () => canRedo() },
+    { sep: true },
+    { label: 'Cut', key: 'Ctrl+X', run: () => cutSelection(), need: 'selection' },
+    { label: 'Copy', key: 'Ctrl+C', run: () => copySelection(), need: 'selection' },
+    { label: 'Paste', key: 'Ctrl+V', run: () => pasteClipboard(), need: () => canPaste() },
+    { sep: true },
     { label: 'Duplicate', key: 'Ctrl+D', run: () => duplicateSelected(), need: 'selection' },
     { label: 'Delete', key: 'Del', run: () => selected && removeDoc(selected), need: 'selection' },
     { sep: true },
@@ -1578,7 +1761,9 @@ function openMenu(itemEl, keep){
     if (it.title){ const t = document.createElement('div'); t.className = 'mb-title'; t.textContent = it.title; drop.appendChild(t); return; }
     const row = document.createElement('div');
     row.className = 'mb-row';
-    if (it.need === 'selection' && !selected) row.classList.add('disabled');
+    const blocked = it.need === 'selection' ? !selected
+                  : (typeof it.need === 'function' ? !it.need() : false);
+    if (blocked) row.classList.add('disabled');
     const check = it.check ? (it.check() ? '✓' : '') : '';
     row.innerHTML = `<span class="mb-check">${check}</span><span>${esc(it.label)}</span>` +
       (it.key ? `<span class="mb-key">${esc(it.key)}</span>` : '');
