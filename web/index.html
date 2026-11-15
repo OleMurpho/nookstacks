@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nookstacks</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="themes.css?v=1">
 <script type="importmap">
 { "imports": {
     "three": "./vendor/three/three.module.js",
@@ -40,6 +41,9 @@
     <div class="railhead second">Projects</div>
     <div id="projList"></div>
     <button id="addProj" class="railadd" title="Add project">+</button>
+    <div class="railfoot">
+      <button id="openSettings" title="Settings"><span>⚙</span>Settings</button>
+    </div>
   </aside>
   <div id="world"></div>
   <button id="navPrev" class="navarrow left" hidden title="Previous project">‹</button>
@@ -47,6 +51,37 @@
   <div id="empty" hidden>
     <p>Nothing on this shelf yet.</p>
     <p class="sub">Import a file, drop one onto the board, or press <b>N</b> to write.</p>
+  </div>
+
+  <div id="settings" hidden>
+    <div class="scrim" data-close></div>
+    <section class="drawer" role="dialog" aria-label="Settings">
+      <header><h2>Settings</h2><button class="setx" data-close title="Close (Esc)">✕</button></header>
+
+      <div class="sgroup">
+        <div class="slabel">Theme</div>
+        <div class="themes" id="themeGrid"></div>
+      </div>
+
+      <div class="sgroup">
+        <div class="srow"><span>Text size</span>
+          <div class="seg" data-set="size"><button data-v="compact">S</button><button data-v="regular">M</button><button data-v="large">L</button></div>
+        </div>
+        <div class="srow"><span>Board grid</span>
+          <div class="seg" data-set="grid"><button data-v="off">Off</button><button data-v="on">On</button></div>
+        </div>
+        <div class="srow"><span>Reduce motion</span>
+          <div class="seg" data-set="motion"><button data-v="full">Off</button><button data-v="reduce">On</button></div>
+        </div>
+      </div>
+
+      <div class="sgroup">
+        <div class="srow"><span>Board data</span><button class="linkbtn" id="vaultBtn">Open folder</button></div>
+        <div class="srow"><span>Version</span><span class="ver">0.1.0</span></div>
+      </div>
+
+      <footer><button class="ghostbtn" id="settingsReset">Reset to defaults</button></footer>
+    </section>
   </div>
 
   <input id="fileinput" type="file" multiple hidden>

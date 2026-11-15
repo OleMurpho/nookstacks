@@ -151,6 +151,54 @@ const vault = {
 };
 
 let db = seed();
+
+/* ---------------------------------------------------------------- settings */
+const DEFAULT_SETTINGS = { theme:'obsidian', size:'regular', grid:'on', motion:'full' };
+const THEMES = [
+  { id:'obsidian',   name:'Obsidian',   sw:['#07080a','#151a20','#e0a94f','#f6f1e5'] },
+  { id:'manuscript', name:'Manuscript', sw:['#12100c','#221c15','#d79a4a','#f5e8d0'] },
+  { id:'graphite',   name:'Graphite',   sw:['#0b0d0f','#1a1f24','#8fb0dd','#eef1f5'] },
+  { id:'daylight',   name:'Daylight',   sw:['#e8e4db','#ffffff','#a2621f','#fffdf8'] }
+];
+function settings(){ if (!db.settings) db.settings = { ...DEFAULT_SETTINGS }; return db.settings; }
+function applySettings(){
+  const s = settings(), r = document.documentElement;
+  r.dataset.theme = s.theme; r.dataset.size = s.size;
+  r.dataset.grid = s.grid; r.dataset.motion = s.motion;
+  paintSettings();
+}
+function paintSettings(){
+  const s = settings();
+  document.querySelectorAll('#themeGrid button').forEach(b => b.classList.toggle('on', b.dataset.theme === s.theme));
+  document.querySelectorAll('#settings .seg').forEach(seg => {
+    const key = seg.dataset.set;
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === s[key]));
+  });
+}
+function buildThemes(){
+  const grid = document.getElementById('themeGrid');
+  if (!grid || grid.childElementCount) return;
+  THEMES.forEach(t => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.theme = t.id;
+    b.innerHTML = '<span class="swatch">' + t.sw.map(c => '<i style="background:' + c + '"></i>').join('') + '</span>'
+                + '<span class="trow"><span class="tname">' + t.name + '</span><span class="tick">●</span></span>';
+    b.onclick = () => { settings().theme = t.id; applySettings(); save(); };
+    grid.appendChild(b);
+  });
+}
+function setSetting(key, value){ settings()[key] = value; applySettings(); save(); }
+const settingsOpen = () => !document.getElementById('settings').hidden;
+function openSettings(){ document.getElementById('settings').hidden = false; paintSettings(); }
+function closeSettings(){ document.getElementById('settings').hidden = true; }
+
+// paint before boot so a saved theme is on screen from the first frame
+try {
+  const cached = JSON.parse(localStorage.getItem(LKEY) || 'null');
+  if (cached && cached.settings) db.settings = { ...DEFAULT_SETTINGS, ...cached.settings };
+} catch {}
+applySettings();
+
 let storeReady = false;
 let dirtyAfterBoot = false;
 let saveT = 0;
@@ -215,6 +263,9 @@ async function boot(){
     setSaveState(DESKTOP ? 'vault unavailable' : 'offline — changes kept in this browser only', 'bad');
   }
   storeReady = true;
+  // a fresh vault should record its defaults, not just imply them
+  if (!db.settings){ db.settings = { ...DEFAULT_SETTINGS }; dirtyAfterBoot = true; }
+  applySettings();
   render();
   if (dirtyAfterBoot){ dirtyAfterBoot = false; save(); }
 }
@@ -908,7 +959,13 @@ function toggleDraw(on){
 /* ---------------------------------------------------------------- input */
 addEventListener('keydown', e => {
   const typing = e.target.isContentEditable || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT';
-  if (e.key === 'Escape'){ if (drawMode) toggleDraw(false); if (typing) e.target.blur(); select(null); return; }
+  if (e.key === 'Escape'){
+    if (settingsOpen()){ closeSettings(); return; }
+    if (drawMode) toggleDraw(false);
+    if (typing) e.target.blur();
+    select(null); return;
+  }
+  if (settingsOpen()) return;
   if (typing) return;
   switch (e.key){
     case 'ArrowUp': e.preventDefault(); goLevel(level-1); break;
@@ -919,6 +976,7 @@ addEventListener('keydown', e => {
     case 't': case 'T': e.preventDefault(); newText(); break;
     case 'f': case 'F': e.preventDefault(); fitView(); break;
     case 'g': case 'G': e.preventDefault(); toggleDraw(); break;
+    case 's': case 'S': e.preventDefault(); openSettings(); break;
     case 'Delete': case 'Backspace': if (selected){ e.preventDefault(); removeDoc(selected); } break;
   }
 });
@@ -937,6 +995,18 @@ document.querySelectorAll('.tb-tools button').forEach(b => {
   };
 });
 $('#fileinput').addEventListener('change', e => { addFiles([...e.target.files]); e.target.value = ''; });
+
+/* settings panel */
+buildThemes();
+document.getElementById('openSettings').onclick = openSettings;
+document.querySelectorAll('#settings [data-close]').forEach(el => el.onclick = closeSettings);
+document.querySelectorAll('#settings .seg').forEach(seg =>
+  seg.querySelectorAll('button').forEach(b => b.onclick = () => setSetting(seg.dataset.set, b.dataset.v)));
+document.getElementById('settingsReset').onclick = () => { db.settings = { ...DEFAULT_SETTINGS }; applySettings(); save(); };
+document.getElementById('vaultBtn').onclick = () => {
+  if (DESKTOP) call('open_vault', {}).catch(e => note('errors', e));
+  else alert('In the browser build the board lives in the dev server\u2019s vault folder.');
+};
 
 addEventListener('dragover', e => { e.preventDefault(); });
 addEventListener('drop', async e => {

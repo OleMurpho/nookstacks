@@ -49,12 +49,43 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 | `←` `→` | change project |
 | `N` | new note where the cursor is |
 | `G` | draw a region around things |
+| `S` | open settings |
+| `Esc` | close the settings panel, cancel a region, deselect |
 | double-click a note | edit it, click away to save |
 | right-drag | pan the board |
 | wheel | zoom; over a scrollable document or a model, it scrolls or zooms that instead |
 | double-click a model | nothing — drag to orbit, wheel to zoom |
 
 Regions get moved by their label, resized by their corner handles, renamed by double-clicking the label, and deleted with the ✕ inside it.
+
+## Settings and themes
+
+Click **⚙ Settings** at the bottom of the sidebar, or press `S`.
+
+**Themes** — the whole interface is drawn from one set of colour tokens, so a theme is a palette swap and every surface follows it:
+
+- **Obsidian** — near-black, amber accent, cream paper. The default.
+- **Manuscript** — warm browns and parchment, for long evenings.
+- **Graphite** — cool neutral with a steel-blue accent.
+- **Daylight** — light chrome and warm paper, for a bright room or a projector.
+
+![Settings](docs/settings.png)
+
+**Text size** — S / M / L, scaling card titles, note text and code.
+
+**Board grid** — turn the dotted grid off for a cleaner canvas.
+
+**Reduce motion** — disables board travel animation and zooming transitions. The app also honours your system's reduced-motion preference when this is left at Off.
+
+**Board data → Open folder** — opens the vault directory in your file manager, so backups are one click away.
+
+Your choices are stored in `state.json` alongside the board, under `settings`, so they travel with the vault and survive reinstalls. **Reset to defaults** puts everything back to Obsidian, M, grid on, motion on.
+
+<p align="center">
+  <img src="docs/theme-manuscript.png" width="49%" alt="Manuscript theme">
+  <img src="docs/theme-graphite.png" width="49%" alt="Graphite theme">
+  <img src="docs/theme-daylight.png" width="49%" alt="Daylight theme">
+</p>
 
 ## Build from source
 
@@ -86,6 +117,8 @@ The same web bundle runs in two shells:
 
 ```
 web/                 the entire interface, plain ES modules, no build step
+web/style.css        layout, driven entirely by colour tokens
+web/themes.css       the palettes: one block of variables per theme
 src-tauri/           the desktop shell: Rust, file system, installers
 dev/server.py        a small HTTP server with the same API, for browser dev
 ```

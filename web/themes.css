@@ -1,0 +1,76 @@
+/* Themes.
+   Every colour in style.css is a token, so a theme is just a set of variable
+   values. Add one by copying a block and changing the values; nothing else in
+   the interface needs to know it exists. */
+
+/* warm parchment, like working under a desk lamp */
+:root[data-theme="manuscript"]{
+  --amber:#d79a4a; --amber-rgb:215,154,74;
+  --chrome-rgb:14,12,9; --chrome-hover-rgb:32,27,21;
+  --bg:#12100c; --bg-deep:#0c0a08; --bg2:#17140f; --chip:#1d1913; --chip-ink:#f3e6cf;
+  --card-top:#221c15; --card-bot:#15110c; --card-ink:#e8dcc7; --card-dim:#8a7b63; --card-badge:#9a8a70;
+  --code-bg:#1a1510; --viewer-a:#241d15; --viewer-b:#100d09;
+  --paper:#f5e8d0; --paper2:#e8d7b8; --paper-ink:#31281c;
+  --grip:#b09d7c; --badge-ink:#a08a63; --close-ink:#a8946f; --close-hover:#4a3a24;
+  --body-h:#6d5a3c; --file-ink:#5f4f38; --file-link:#8a5f16;
+  --text:#e9dfcd; --muted:#a2937b; --dim:#7a6c57; --dim2:#6f6350; --dim3:#5b5245;
+  --rail-ink:#b0a089; --rail-head:#8d7d66; --rail-item:#c6b9a2; --rail-on:#f5e3c2;
+  --rail-count:#86785f; --rail-plus:#8f7f66; --rail-tick:#584d3f;
+  --sep:#4a4136; --dot-line:#5b5245; --ui-text:#dbcbb2;
+  --accent-bright:#f0c07a; --gdel:#a3906f; --gdel-hover:#f0c07a;
+  --ok:#b6c98f; --bad:#e08a6a;
+  --hair:rgba(255,240,220,.10);
+}
+
+/* cool neutral, steel blue instead of gold */
+:root[data-theme="graphite"]{
+  --amber:#8fb0dd; --amber-rgb:143,176,221;
+  --chrome-rgb:10,12,15; --chrome-hover-rgb:26,32,38;
+  --bg:#0b0d0f; --bg-deep:#07090a; --bg2:#101316; --chip:#171b1f; --chip-ink:#eef2f7;
+  --card-top:#1a1f24; --card-bot:#111519; --card-ink:#d6dee7; --card-dim:#6a757f; --card-badge:#77828c;
+  --code-bg:#12161a; --viewer-a:#1d242b; --viewer-b:#0b0e11;
+  --paper:#eef1f5; --paper2:#dde2e9; --paper-ink:#1e242a;
+  --grip:#a8b2be; --badge-ink:#8f9aa6; --close-ink:#9aa5b1; --close-hover:#2b333b;
+  --body-h:#5f6a76; --file-ink:#5a6672; --file-link:#3f6ea8;
+  --text:#dde4ec; --muted:#8f9aa6; --dim:#636d78; --dim2:#5f6974; --dim3:#4c555f;
+  --rail-ink:#95a0ac; --rail-head:#636d78; --rail-item:#a8b3bf; --rail-on:#dfe8f3;
+  --rail-count:#74808b; --rail-plus:#8994a0; --rail-tick:#4c565f;
+  --sep:#3f4850; --dot-line:#4c555f; --ui-text:#c9d3de;
+  --accent-bright:#b9d0ee; --gdel:#7c8794; --gdel-hover:#b9d0ee;
+  --ok:#7fb07f; --bad:#e08a6a;
+  --hair:rgba(200,220,255,.10);
+}
+
+/* light: for a bright room, or printing the board */
+:root[data-theme="daylight"]{
+  --amber:#a2621f; --amber-rgb:162,98,31;
+  --chrome-rgb:250,247,240; --chrome-hover-rgb:233,228,216;
+  --bg:#e8e4db; --bg-deep:#ddd8ce; --bg2:#f5f2ea; --chip:#ffffff; --chip-ink:#2a2f36;
+  --card-top:#ffffff; --card-bot:#f4f1ea; --card-ink:#2b3037; --card-dim:#7a838d; --card-badge:#8a939d;
+  --code-bg:#f7f4ec; --viewer-a:#e6e9ee; --viewer-b:#d3d8df;
+  --paper:#fffdf8; --paper2:#f2ece0; --paper-ink:#22272f;
+  --grip:#b0a48c; --badge-ink:#8d8067; --close-ink:#9a8d74; --close-hover:#3a2f22;
+  --body-h:#6b6250; --file-ink:#5d5648; --file-link:#8a5f16;
+  --text:#2a2f36; --muted:#5f6873; --dim:#7d8590; --dim2:#8b939d; --dim3:#9aa2ac;
+  --rail-ink:#5f6873; --rail-head:#6d7681; --rail-item:#333a42; --rail-on:#8a5a18;
+  --rail-count:#78818b; --rail-plus:#6b737d; --rail-tick:#c3c8ce;
+  --sep:#b9bfc6; --dot-line:#b9bfc6; --ui-text:#3a4048;
+  --accent-bright:#8a5a18; --gdel:#8d8067; --gdel-hover:#a2621f;
+  --ok:#3f7a45; --bad:#b4472f;
+  --hair:rgba(20,25,35,.12); --frame-bg:#fff;
+}
+
+/* text size, set from the settings panel */
+:root[data-size="compact"]{ --scale:.9 }
+:root[data-size="large"]{ --scale:1.12 }
+
+/* an explicit setting, so it wins over the system preference below */
+:root[data-motion="reduce"] #world,
+:root[data-motion="reduce"] .obj{ transition:none !important }
+
+/* the board grid on the panel background */
+:root[data-grid="off"] #cylinder{
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(var(--amber-rgb),.10), transparent 60%),
+    linear-gradient(180deg,var(--bg2),var(--bg) 45%,var(--bg-deep));
+}
