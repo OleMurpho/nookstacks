@@ -10,7 +10,7 @@ import { parseBlend, createObjects } from './vendor/blend/index.js';
 
 /* ---------------------------------------------------------------- consts */
 const SW = 1240, SH = 780, RAILW = 232;
-const LKEY = 'knollstack.v3';
+const LKEY = 'nookstacks.v3';
 const TEXT_EXT = /\.(txt|md|markdown|csv|json|ya?ml|toml|ini|cfg|conf|log|xml|html?|css|js|mjs|ts|tsx|jsx|py|rb|go|rs|c|h|cpp|hpp|cs|java|kt|lua|sh|bash|zsh|sql|glsl|hlsl|vsh|fsh|vue|svelte)$/i;
 const MODEL_EXT = /\.(glb|gltf|obj|stl|fbx|ply|dae|blend)$/i;
 const IMG_EXT = /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i;
@@ -24,7 +24,7 @@ const idb = {
   async open(){
     if (this.db) return this.db;
     this.db = await new Promise((res, rej) => {
-      const r = indexedDB.open('knollstack', 1);
+      const r = indexedDB.open('nookstacks', 1);
       r.onupgradeneeded = () => r.result.createObjectStore('blobs');
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
@@ -60,7 +60,7 @@ function seed(){
       { id:'wetnoodle', name:'WETNOODLE', pan:{x:0,y:0,z:1}, groups:[
           { id:'g4', name:'ARCHIVE', x:70, y:100, w:540, h:400 } ],
         docs:[ mk('note','Local memory', 96, 150, 260, 160, { text:'<p>Transcripts, skills and notes in one local SQLite archive.</p>' }) ] },
-      { id:'knollstack', name:'KNOLLSTACK', pan:{x:0,y:0,z:1}, groups:[
+      { id:'nookstacks', name:'NOOKSTACKS', pan:{x:0,y:0,z:1}, groups:[
           { id:'g5', name:'CONCEPT', x:70, y:100, w:540, h:400 } ],
         docs:[ mk('note','The tower', 96, 150, 300, 170, { text:'<p>Category levels stacked vertically. Each level holds project bookshelves. Each bookshelf is an endless board.</p>' }) ] }
     ]},
@@ -947,7 +947,7 @@ addEventListener('drop', async e => {
 
 /* desktop: the OS drop arrives as paths through the Rust side, not as File objects */
 if (DESKTOP && TAURI.event){
-  TAURI.event.listen('knollstack://drop', e => {
+  TAURI.event.listen('nookstacks://drop', e => {
     importPaths(e.payload || []);
   });
 }
@@ -1107,7 +1107,7 @@ try { render(); } catch (e) {
   window.__err = e.message + '\n' + (e.stack || '');
   console.error(e);
 }
-window.__knollstack = { get db(){ return db; }, addFiles, place, removeDoc, DBG, get cam(){ return { ...cam }; }, get state(){ return { level, shelf, selected, docs: curShelf().docs.length }; } };
+window.__nookstacks = { get db(){ return db; }, addFiles, place, removeDoc, DBG, get cam(){ return { ...cam }; }, get state(){ return { level, shelf, selected, docs: curShelf().docs.length }; } };
 
 /* go: read the vault, then draw */
 boot();

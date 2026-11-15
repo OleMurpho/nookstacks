@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Knollstack main window",
+  "description": "Nookstacks main window",
   "windows": [
     "main"
   ],
