@@ -1,4 +1,4 @@
-// Tartaros desktop shell.
+// Knollstack desktop shell.
 //
 // The app is the same web bundle that runs in a browser; this crate only
 // replaces the HTTP API with direct file access. All file system work lives in
@@ -116,7 +116,7 @@ pub fn run() {
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())
                     .collect();
-                let _ = window.emit("tartaros://drop", list);
+                let _ = window.emit("knollstack://drop", list);
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -131,5 +131,5 @@ pub fn run() {
             open_vault
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Tartaros");
+        .expect("error while running Knollstack");
 }

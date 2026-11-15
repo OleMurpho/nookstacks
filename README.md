@@ -1,6 +1,6 @@
-# Tartaros
+# Knollstack
 
-![Tartaros](docs/screenshot.png)
+![Knollstack](docs/screenshot.png)
 
 A tower of project bookshelves. Each category is a level, each level holds projects, each project is an infinite board where you place documents — notes, code, PDFs, images, video, 3D models — anywhere, at any size, and edit the text ones in place.
 
@@ -12,13 +12,13 @@ Windows and Linux.
 
 Grab the installer for your system from [Releases](../../releases).
 
-**Windows** — run `Tartaros_*_x64-setup.exe`. It installs per-user, so no administrator rights are needed. The `.msi` is there if you prefer MSI deployment.
+**Windows** — run `Knollstack_*_x64-setup.exe`. It installs per-user, so no administrator rights are needed. The `.msi` is there if you prefer MSI deployment.
 
 **Linux** — take the `.AppImage`, make it executable, run it:
 
 ```bash
-chmod +x Tartaros_*.AppImage
-./Tartaros_*.AppImage
+chmod +x Knollstack_*.AppImage
+./Knollstack_*.AppImage
 ```
 
 Or use the `.deb` / `.rpm` for your distribution's package manager. Both pull in `libwebkit2gtk-4.1`, which the app renders with.
@@ -27,8 +27,8 @@ Or use the `.deb` / `.rpm` for your distribution's package manager. Both pull in
 
 | OS | Path |
 |---|---|
-| Windows | `%APPDATA%\Tartaros\vault` |
-| Linux | `~/.local/share/Tartaros/vault` |
+| Windows | `%APPDATA%\Knollstack\vault` |
+| Linux | `~/.local/share/Knollstack/vault` |
 
 Inside is the whole board:
 
@@ -39,7 +39,7 @@ history/            rolling snapshots, the last 40 saves
 blobs/              imported files, one file per import
 ```
 
-Saves are atomic — written to a temp file, fsynced, then renamed — so an interrupted write can't corrupt `state.json`. Set `TARTAROS_VAULT=/some/path` to keep the vault somewhere else, such as a synced folder.
+Saves are atomic — written to a temp file, fsynced, then renamed — so an interrupted write can't corrupt `state.json`. Set `KNOLLSTACK_VAULT=/some/path` to keep the vault somewhere else, such as a synced folder.
 
 ## Using it
 

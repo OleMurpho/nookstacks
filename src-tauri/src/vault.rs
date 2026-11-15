@@ -172,12 +172,12 @@ fn data_dir() -> PathBuf {
 
 pub fn vault_dir() -> &'static Path {
     VAULT.get_or_init(|| {
-        if let Ok(p) = std::env::var("TARTAROS_VAULT") {
+        if let Ok(p) = std::env::var("KNOLLSTACK_VAULT") {
             if !p.trim().is_empty() {
                 return PathBuf::from(p);
             }
         }
-        data_dir().join("Tartaros").join("vault")
+        data_dir().join("Knollstack").join("vault")
     })
 }
 
@@ -235,7 +235,7 @@ mod tests {
     use super::*;
 
     fn vault(tag: &str) -> (Vault, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("tartaros-test-{}-{}", tag, now_ms()));
+        let dir = std::env::temp_dir().join(format!("knollstack-test-{}-{}", tag, now_ms()));
         let _ = fs::remove_dir_all(&dir);
         (Vault::at(dir.clone()), dir)
     }
@@ -312,7 +312,7 @@ mod tests {
     fn import_copies_files_and_reports_metadata() {
         let (v, dir) = vault("import");
         v.ensure_dirs().unwrap();
-        let src = std::env::temp_dir().join(format!("tartaros-src-{}.stl", now_ms()));
+        let src = std::env::temp_dir().join(format!("knollstack-src-{}.stl", now_ms()));
         fs::write(&src, vec![0u8; 2048]).unwrap();
 
         let got = v.import(&[src.to_string_lossy().to_string()]).unwrap();

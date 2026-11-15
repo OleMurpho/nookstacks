@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tartaros server: serves the app and keeps the vault on disk.
+Knollstack server: serves the app and keeps the vault on disk.
 
     python3 dev/server.py [port]
 
@@ -30,7 +30,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(os.path.dirname(ROOT), "web")
-VAULT = os.environ.get("TARTAROS_VAULT") or os.path.join(os.path.dirname(ROOT), "vault")
+VAULT = os.environ.get("KNOLLSTACK_VAULT") or os.path.join(os.path.dirname(ROOT), "vault")
 BLOBS = os.path.join(VAULT, "blobs")
 HISTORY = os.path.join(VAULT, "history")
 STATE = os.path.join(VAULT, "state.json")
@@ -90,7 +90,7 @@ def write_state(state):
 
 
 class Handler(SimpleHTTPRequestHandler):
-    server_version = "Tartaros/1.0"
+    server_version = "Knollstack/1.0"
 
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=WEB, **kw)
@@ -198,7 +198,7 @@ def main():
     srv = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     state, saved = read_state()
     n = len(state["levels"]) if state else 0
-    print(f"Tartaros on http://localhost:{port}   vault: {VAULT}   levels: {n}   saved: {saved or 'never'}")
+    print(f"Knollstack on http://localhost:{port}   vault: {VAULT}   levels: {n}   saved: {saved or 'never'}")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

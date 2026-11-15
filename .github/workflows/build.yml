@@ -46,7 +46,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: tartaros-${{ matrix.name }}
+          name: knollstack-${{ matrix.name }}
           path: |
             src-tauri/target/release/bundle/deb/**
             src-tauri/target/release/bundle/rpm/**
@@ -79,7 +79,7 @@ jobs:
           body: |
             Installers for Windows and Linux, built from this tag.
 
-            **Windows** — run `Tartaros_*_x64-setup.exe` (per-user install, no admin needed) or the `.msi`.
+            **Windows** — run `Knollstack_*_x64-setup.exe` (per-user install, no admin needed) or the `.msi`.
             **Linux** — the `.AppImage` runs on any distribution; the `.deb`/`.rpm` are for the matching package manager.
 
-            Data lives in `%APPDATA%\Tartaros\vault` on Windows and `~/.local/share/Tartaros/vault` on Linux.
+            Data lives in `%APPDATA%\Knollstack\vault` on Windows and `~/.local/share/Knollstack/vault` on Linux.

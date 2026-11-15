@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Tartaros",
+  "productName": "Knollstack",
   "version": "0.1.0",
-  "identifier": "io.github.olemurpho.tartaros",
+  "identifier": "io.github.olemurpho.knollstack",
   "build": {
     "frontendDist": "../web"
   },
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Tartaros",
+        "title": "Knollstack",
         "width": 1440,
         "height": 900,
         "minWidth": 1024,
@@ -45,10 +45,10 @@
     ],
     "category": "Productivity",
     "shortDescription": "Project bookshelves in an infinite tower",
-    "longDescription": "Tartaros stores your projects as a tower of levels, each level a shelf of boards, each board an infinite canvas of documents you can place, resize and edit in place.",
+    "longDescription": "Knollstack stores your projects as a tower of levels, each level a shelf of boards, each board an infinite canvas of documents you can place, resize and edit in place.",
     "copyright": "MIT licensed",
     "publisher": "OleMurpho",
-    "homepage": "https://github.com/OleMurpho/tartaros",
+    "homepage": "https://github.com/OleMurpho/knollstack",
     "linux": {
       "deb": {
         "depends": [
