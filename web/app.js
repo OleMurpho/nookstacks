@@ -255,8 +255,12 @@ let level = 0, shelf = 0, cam = { x:0, y:0, z:1 };
 let drawMode = false;
 const DBG = { errors: [], down: 0, move: 0, up: 0, wheel: 0, zooms: 0, carddown: 0, cardmove: 0, dblclick: 0, focused: 0 };
 function note(kind, extra){ DBG[kind]++; if (extra) DBG.errors.push(String(extra).slice(0, 200)); }
+/* selection is a set: ctrl-click adds, the marquee fills it, and everything
+   that acts on 'the selection' acts on all of it. `selected` stays the primary
+   (last touched) id for the few places that need exactly one. */
+let sel = new Set();
 let selected = null;
-const viewers = [];
+  const viewers = [];
 const urls = new Map();
 
 const $ = s => document.querySelector(s);
@@ -515,7 +519,7 @@ function makeViewer(canvas, doc){
   }
 
   // ---- render only when something actually changed (no idle 60fps loop) ----
-  const state = { renderer, scene, camera, controls, raf:0, dead:false, ro:null, dirty:false };
+  const state = { renderer, scene, camera, controls, raf:0, dead:false, ro:null, dirty:false, fit, wire:false };
   const draw = () => {
     state.raf = 0;
     if (state.dead) return;
@@ -535,13 +539,14 @@ function makeViewer(canvas, doc){
     state.dirty = true;
     state.raf = requestAnimationFrame(draw);
   };
+  state.schedule = schedule;
   controls.addEventListener('change', schedule);
   if (typeof ResizeObserver !== 'undefined'){
     state.ro = new ResizeObserver(schedule);
     state.ro.observe(canvas.parentElement || canvas);
   }
   schedule();
-  const origFit = fit;
+  canvas.__viewer = state;
   return state;
 }
 
@@ -588,7 +593,7 @@ function render(){
   $('#projectName').textContent = cur.name;
   $('#counts').textContent = `${cur.docs.length} items · ${shelf+1}/${shelflist.length}`;
   $('#empty').hidden = cur.docs.length > 0;
-  $('#btnDelete').disabled = !selected;
+  paintSelection();
   $('#navPrev').hidden = shelf === 0;
   $('#navNext').hidden = shelf >= shelflist.length - 1;
 
@@ -605,13 +610,19 @@ function render(){
     wireBody(el, doc);
     wireHead(el, doc);
     wireHandles(el, doc);
-    el.addEventListener('pointerdown', e => { if (e.button === 0) select(doc.id); }, true);
+    el.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      if (e.ctrlKey || e.metaKey){ toggleSel(doc.id); e.stopPropagation(); return; }
+      if (e.shiftKey){ addSel(doc.id); e.stopPropagation(); return; }
+      if (!sel.has(doc.id)) select(doc.id);       // clicking inside a multi-selection keeps it
+      else { selected = doc.id; paintSelection(); }
+    }, true);
     el.querySelector('.close').onclick = e => { e.stopPropagation(); removeDoc(doc.id); };
     if (doc.kind === 'model'){
       const canvas = el.querySelector('canvas.mesh');
       if (canvas) viewers.push(makeViewer(canvas, doc));
     }
-    if (selected === doc.id) el.classList.add('selected');
+    if (sel.has(doc.id)) el.classList.add('selected');
   });
 
   wireGroups(world.querySelector('.panel:not(.peek)'), cur);
@@ -792,7 +803,7 @@ function addCategory(){
   const id = 'l' + Math.random().toString(36).slice(2,9);
   db.levels.push({ id, name: 'New category ' + n, shelves: [
     { id: 'p' + Math.random().toString(36).slice(2,9), name: 'New project', pan:{x:0,y:0,z:1}, groups:[], docs:[] } ] });
-  level = db.levels.length - 1; shelf = 0; selected = null;
+  level = db.levels.length - 1; shelf = 0; clearSel();
   cam = { x:0, y:0, z:1 };
   save(); render();
 }
@@ -801,7 +812,7 @@ function addProject(){
   const id = 'p' + Math.random().toString(36).slice(2,9);
   curLevel().shelves.push({ id, name: 'New project', pan:{x:0,y:0,z:1}, groups:[], docs:[] });
   shelf = curLevel().shelves.length - 1;
-  cam = { x:0, y:0, z:1 }; selected = null;
+  cam = { x:0, y:0, z:1 }; clearSel();
   save(); render();
 }
 
@@ -835,13 +846,21 @@ function wireHead(el, doc){
   head.addEventListener('mousedown', e => {
     if (e.target.closest('.close')) return;
     if (e.button !== 0) return;               // right/middle belongs to the board
+    if (e.ctrlKey || e.metaKey || e.shiftKey) return;  // that click is for selecting
     e.preventDefault(); e.stopPropagation();
-    select(doc.id);
+    if (!sel.has(doc.id)) select(doc.id);
     note('carddown');
     const z = cam.z * fitZoom();
     const sx = e.clientX, sy = e.clientY, ox = doc.x, oy = doc.y;
+    // every other selected card travels with this one
+    const mates = selDocs().filter(d => d.id !== doc.id).map(d => ({ d, x: d.x, y: d.y }));
     const move = ev => {
       note('cardmove');
+      const ddx = (ev.clientX - sx) / z, ddy = (ev.clientY - sy) / z;
+      mates.forEach(m => { m.d.x = m.x + ddx; m.d.y = m.y + ddy;
+        const me = document.querySelector(`.obj[data-id="${m.d.id}"]`);
+        if (me){ me.style.left = m.d.x + 'px'; me.style.top = m.d.y + 'px'; }
+      });
       doc.x = ox + (ev.clientX - sx) / z;
       doc.y = oy + (ev.clientY - sy) / z;
       el.style.left = doc.x + 'px'; el.style.top = doc.y + 'px';
@@ -889,10 +908,45 @@ function wireHandles(el, doc){
 /* ---------------------------------------------------------------- docs */
 function findDoc(id){ return curShelf().docs.find(d => d.id === id); }
 let zTop = 10;
-function select(id){ selected = id; $('#btnDelete').disabled = !id;
-  const el = id && document.querySelector(`.obj[data-id="${id}"]`);
-  if (el) el.style.zIndex = ++zTop;
-  document.querySelectorAll('.obj').forEach(o => o.classList.toggle('selected', o.dataset.id === id)); }
+function paintSelection(){
+  document.querySelectorAll('.obj').forEach(o => o.classList.toggle('selected', sel.has(o.dataset.id)));
+  const btn = $('#btnDelete');
+  if (btn) btn.disabled = sel.size === 0;
+  const n = sel.size;
+  if (btn && n > 1) btn.title = 'Delete ' + n + ' items';
+  else if (btn) btn.title = 'Delete';
+}
+
+function select(id){
+  sel = new Set(id ? [id] : []);
+  selected = id || null;
+  if (id){ const el = document.querySelector(`.obj[data-id="${id}"]`); if (el) el.style.zIndex = ++zTop; }
+  paintSelection();
+}
+
+function toggleSel(id){
+  const el = document.querySelector(`.obj[data-id="${id}"]`);
+  if (sel.has(id)) sel.delete(id); else { sel.add(id); if (el) el.style.zIndex = ++zTop; }
+  selected = sel.has(id) ? id : (sel.size ? [...sel][sel.size - 1] : null);
+  paintSelection();
+}
+
+function addSel(id){
+  if (!sel.has(id)){ sel.add(id); const el = document.querySelector(`.obj[data-id="${id}"]`); if (el) el.style.zIndex = ++zTop; }
+  selected = id;
+  paintSelection();
+}
+
+function selectMany(ids){
+  sel = new Set(ids);
+  selected = ids.length ? ids[ids.length - 1] : null;
+  paintSelection();
+}
+
+function clearSel(){ sel = new Set(); selected = null; paintSelection(); }
+
+const selDocs = () => curShelf().docs.filter(d => sel.has(d.id));
+const selIds  = () => [...sel].filter(id => findDoc(id));
 
 function place(kind, title, extra = {}, size = { w: 300, h: 200 }){
   const p = screenToPanel(innerWidth/2, innerHeight/2);
@@ -909,6 +963,27 @@ function newNote(){ const d = place('note','Untitled note', { text:'<p><br></p>'
   const el = document.querySelector(`.obj[data-id="${d.id}"] .body`); if (el) el.focus(); }
 function newText(){ place('text','Untitled.md', { text:'' }, { w:420, h:320 }); }
 
+function removeSelection(){
+  const ids = selIds();
+  if (!ids.length) return;
+  const s = curShelf();
+  const gone = [];
+  ids.forEach(id => {
+    const i = s.docs.findIndex(d => d.id === id);
+    if (i >= 0) gone.push(s.docs.splice(i, 1)[0]);
+  });
+  // a card's file only goes when nothing else on any shelf still points at it
+  gone.forEach(doc => {
+    if (!doc.blobId) return;
+    const inUse = db.levels.some(l => l.shelves.some(sh => sh.docs.some(d => d.blobId === doc.blobId)));
+    if (!inUse){ idb.del(doc.blobId); vault.delBlob(doc.blobId); }
+    if (urls.has(doc.id)){ URL.revokeObjectURL(urls.get(doc.id)); urls.delete(doc.id); }
+  });
+  clearSel();
+  save(); render();
+  setSaveState(gone.length > 1 ? 'deleted ' + gone.length + ' items' : 'deleted', 'ok');
+}
+
 function removeDoc(id){
   const s = curShelf();
   const i = s.docs.findIndex(d => d.id === id);
@@ -920,7 +995,9 @@ function removeDoc(id){
     if (!stillUsed){ idb.del(doc.blobId); vault.delBlob(doc.blobId); }
   }
   if (urls.has(doc.id)){ URL.revokeObjectURL(urls.get(doc.id)); urls.delete(doc.id); }
-  if (selected === id) selected = null;
+  sel.delete(id);
+  if (selected === id) selected = sel.size ? [...sel][sel.size - 1] : null;
+  paintSelection();
   save(); render();
 }
 
@@ -1038,7 +1115,7 @@ function goLevel(i){
   w.style.opacity = '0';
   navTimer = setTimeout(() => {
     navTimer = 0;
-    level = i; shelf = 0; selected = null;
+    level = i; shelf = 0; clearSel();
     cam = { ...(curShelf().pan || {x:0,y:0,z:1}) };
     render();
     w.style.transition = 'opacity .3s ease';
@@ -1096,10 +1173,10 @@ addEventListener('keydown', e => {
     const k = (e.key || '').toLowerCase();
     if (k === 'z' && !e.shiftKey){ e.preventDefault(); undo(); return; }
     if ((k === 'z' && e.shiftKey) || k === 'y'){ e.preventDefault(); redo(); return; }
-    if (k === 'c' && selected){ e.preventDefault(); copySelection(); return; }
-    if (k === 'x' && selected){ e.preventDefault(); cutSelection(); return; }
+    if (k === 'c' && sel.size){ e.preventDefault(); copySelection(); return; }
+    if (k === 'x' && sel.size){ e.preventDefault(); cutSelection(); return; }
     if (k === 'v' && CLIP){ e.preventDefault(); pasteClipboard(); return; }
-    if (k === 'a'){ e.preventDefault(); return; }
+    if (k === 'a'){ e.preventDefault(); selectMany(curShelf().docs.map(d => d.id)); return; }
   }
   switch (e.key){
     case 'ArrowUp': e.preventDefault(); goLevel(level-1); break;
@@ -1112,9 +1189,11 @@ addEventListener('keydown', e => {
     case 'g': case 'G': e.preventDefault(); toggleDraw(); break;
     case 's': case 'S': e.preventDefault(); openSettings(); break;
     case '?': e.preventDefault(); showShortcuts(); break;
-    case ']': if (selected){ e.preventDefault(); bringToFront(); } break;
-    case '[': if (selected){ e.preventDefault(); sendToBack(); } break;
-    case 'c': case 'C': if (selected){ e.preventDefault(); centreSelection(); } break;
+    case ']': if (sel.size){ e.preventDefault(); bringToFront(); } break;
+    case '[': if (sel.size){ e.preventDefault(); sendToBack(); } break;
+    case 'c': case 'C': if (sel.size){ e.preventDefault(); centreSelection(); } break;
+    case 'a': case 'A': if (!(e.ctrlKey || e.metaKey)){ e.preventDefault(); selectMany(curShelf().docs.map(d => d.id)); } break;
+    case 'Escape': if (sel.size){ clearSel(); render(); } break;
     case 'F2': e.preventDefault(); renameCurrent('project'); break;
     case 'd': case 'D':
       if (e.ctrlKey || e.metaKey){ e.preventDefault(); duplicateSelected(); }
@@ -1134,7 +1213,7 @@ addEventListener('keydown', e => {
     case '0':
       if (e.ctrlKey || e.metaKey){ e.preventDefault(); zoomActual(); }
       break;
-    case 'Delete': case 'Backspace': if (selected){ e.preventDefault(); removeDoc(selected); } break;
+    case 'Delete': case 'Backspace': if (sel.size){ e.preventDefault(); removeSelection(); } break;
   }
 });
 
@@ -1147,7 +1226,7 @@ document.querySelectorAll('.tb-tools button').forEach(b => {
       case 'url': addUrl(); break;
       case 'fit': fitView(); break;
       case 'region': toggleDraw(); break;
-      case 'delete': if (selected) removeDoc(selected); break;
+      case 'delete': if (sel.size) removeSelection(); break;
     }
   };
 });
@@ -1180,6 +1259,7 @@ if (DESKTOP && TAURI.event){
 }
 
 /* pan + zoom */
+const PAN = { moved: 0 };        // how far the last right-drag travelled: a pan is not a menu
 (function(){
   const world = $('#world');
   // input goes on the stage, never on #world: #world is transformed, so its hit area
@@ -1228,23 +1308,80 @@ if (DESKTOP && TAURI.event){
     // rail, and the whole top strip). A toolbar button used to fall through to
     // here: the press started a pan, which cleared the selection, so Delete had
     // nothing to delete and the board stayed locked to the cursor.
-    const owned = e.target.closest(
+    const chrome = e.target.closest(
       '.obj .head, .obj .h, .obj .close, input, textarea, select, button, .navarrow,' +
-      ' #rail, #topbar, .tb-tools, #menubar, .mb-drop, #settings, .drawer, #sheet,' +
-      ' canvas.mesh, a[href]');
-    if (e.button === 0 && owned) return;
-    note('down');
-    down = true; sx = e.clientX; sy = e.clientY; ox = cam.x; oy = cam.y;
-    world.classList.add('dragging');            // no transition while the hand is down
-    if (e.button === 0 && !e.target.closest('.obj')) select(null);
-    e.preventDefault();
+      ' #rail, #topbar, .tb-tools, #menubar, .mb-drop, #settings, .drawer, #sheet, a[href]');
+    if (chrome) return;
+
+    const overElement = e.target.closest('.obj, .group');
+
+    // right button moves the board, and only over bare canvas: an element keeps
+    // the right button for its own context menu
+    if (e.button === 2){
+      if (overElement) return;
+      note('down');
+      down = true; sx = e.clientX; sy = e.clientY; ox = cam.x; oy = cam.y; PAN.moved = 0;
+      world.classList.add('dragging');
+      return;
+    }
+
+    if (e.button !== 0) return;
+
+    // left button over bare canvas draws a selection box; over a card the card
+    // owns the press (select / drag / edit)
+    if (overElement) return;
+    startMarquee(e);
   });
+
+  /* ------------------------------------------------------------ marquee */
+  let mq = null;
+  function startMarquee(e){
+    const additive = e.ctrlKey || e.metaKey || e.shiftKey;
+    const base = additive ? new Set(sel) : new Set();
+    const box = document.createElement('div');
+    box.id = 'marquee';
+    document.body.appendChild(box);
+    const x0 = e.clientX, y0 = e.clientY;
+    mq = { x0, y0, additive, base, box, hit: new Set(), moved: false };
+
+    const move = ev => {
+      if (!mq) return;
+      const x = Math.min(x0, ev.clientX), y = Math.min(y0, ev.clientY);
+      const w = Math.abs(ev.clientX - x0), h = Math.abs(ev.clientY - y0);
+      if (w > 3 || h > 3) mq.moved = true;
+      mq.box.style.cssText = `display:block;left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+      const r = { l:x, t:y, r:x + w, b:y + h };
+      const hit = new Set(base);
+      document.querySelectorAll('.panel:not(.peek) .obj').forEach(o => {
+        const b = o.getBoundingClientRect();
+        const inside = b.left < r.r && b.right > r.l && b.top < r.b && b.bottom > r.t;
+        o.classList.toggle('marquee-hit', inside);
+        if (inside) hit.add(o.dataset.id);
+      });
+      mq.hit = hit;
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up);
+      if (!mq) return;
+      const { moved, hit, box } = mq;
+      mq = null;
+      box.remove();
+      document.querySelectorAll('.marquee-hit').forEach(o => o.classList.remove('marquee-hit'));
+      if (!moved){ if (!additive){ clearSel(); } return; }   // a click on empty canvas
+      selectMany([...hit]);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    e.preventDefault();
+  }
+
   let pending = null, frame = 0;
   const move = e => {
     note('move');
     if (!down) return;
     // self-heal a missed mouseup: no buttons held means the gesture is over
     if (e.buttons === 0){ end(); return; }
+    PAN.moved = Math.max(PAN.moved, Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy));
     pending = e;
     if (frame) return;
     frame = requestAnimationFrame(() => {
@@ -1344,7 +1481,8 @@ try { render(); } catch (e) {
 }
 window.__nookstacks = { get db(){ return db; }, addFiles, place, removeDoc, DBG,
   get cam(){ return { ...cam }; },
-  get state(){ return { level, shelf, selected, docs: curShelf().docs.length }; },
+  get state(){ return { level, shelf, selected, selection: [...sel], docs: curShelf().docs.length }; },
+  selectMany, toggleSel, clearSel,
   // test surface: drive layout and history without the mouse
   fitView, tidyBoard, render, undo, redo, select, save,
   get contentBounds(){ return contentBounds(); } };
@@ -1375,7 +1513,7 @@ function restore(json, label){
   HIST.last = json;
   level = Math.max(0, Math.min(db.levels.length - 1, level));
   shelf = Math.max(0, Math.min(curLevel().shelves.length - 1, shelf));
-  selected = null;
+  clearSel();
   if (db.settings) applySettings();
   renderRail(); render(); save();
   HIST.quiet = false;
@@ -1403,31 +1541,338 @@ function paintHistory(){
 }
 
 /* ------------------------------------------------------------- clipboard */
-let CLIP = null;
-const canPaste = () => !!CLIP;
+let CLIP = null;            // array of card snapshots
+const canPaste = () => !!(CLIP && CLIP.length);
 
 function copySelection(){
-  const d = curShelf().docs.find(x => x.id === selected);
-  if (!d) return false;
-  CLIP = JSON.parse(JSON.stringify(d));
-  setSaveState('copied “' + d.title + '”', 'ok');
+  const ds = selDocs();
+  if (!ds.length) return false;
+  CLIP = JSON.parse(JSON.stringify(ds));
+  setSaveState(ds.length > 1 ? 'copied ' + ds.length + ' items' : 'copied “' + ds[0].title + '”', 'ok');
   return true;
 }
 function cutSelection(){
   if (!copySelection()) return;
-  removeDoc(selected);
+  removeSelection();
   setSaveState('cut', 'ok');
 }
 function pasteClipboard(){
-  if (!CLIP) return;
-  const d = JSON.parse(JSON.stringify(CLIP));
-  d.id = 'o' + Math.random().toString(36).slice(2, 9);
-  d.x = CLIP.x + 28; d.y = CLIP.y + 28;
-  CLIP.x = d.x; CLIP.y = d.y;          // walk the next paste a step further
-  if (d.title) d.title = d.title.replace(/(\scopy)?$/, ' copy');
-  curShelf().docs.push(d);
-  save(); render(); select(d.id);
+  if (!canPaste()) return;
+  const made = [];
+  CLIP.forEach(src => {
+    const d = JSON.parse(JSON.stringify(src));
+    d.id = 'o' + Math.random().toString(36).slice(2, 9);
+    d.x = src.x + 28; d.y = src.y + 28;
+    src.x = d.x; src.y = d.y;          // walk the next paste a step further
+    if (d.title) d.title = d.title.replace(/(\scopy)?$/, ' copy');
+    curShelf().docs.push(d);
+    made.push(d);
+  });
+  save(); render(); selectMany(made.map(d => d.id));
 }
+
+
+/* ------------------------------------------------------------ context menu */
+/* Right-click menus are built per element, the way every desktop app does it:
+   the rows are the actions that make sense for that kind of card, and the
+   empty board gets board-level actions instead. */
+let ctxEl = null;
+
+function closeCtx(){
+  if (!ctxEl){ return; }
+  ctxEl.remove(); ctxEl = null;
+}
+
+function openCtx(x, y, items){
+  closeCtx();
+  const el = document.createElement('div');
+  el.id = 'ctx';
+  el.setAttribute('role', 'menu');
+  items.forEach(it => {
+    if (it.sep){ const s = document.createElement('div'); s.className = 'ctx-sep'; el.appendChild(s); return; }
+    if (it.head){ const h = document.createElement('div'); h.className = 'ctx-head'; h.textContent = it.head; el.appendChild(h); return; }
+    const row = document.createElement('button');
+    row.className = 'ctx-row' + (it.danger ? ' danger' : '');
+    row.setAttribute('role', 'menuitem');
+    row.innerHTML = `<span>${esc(it.label)}</span>${it.key ? `<i class="kb">${esc(it.key)}</i>` : ''}`;
+    if (it.need && !it.need()) row.classList.add('disabled');
+    else row.onclick = ev => { ev.stopPropagation(); closeCtx(); it.run(); };
+    el.appendChild(row);
+  });
+  document.body.appendChild(el);
+  ctxEl = el;
+  // keep the menu on screen
+  const r = el.getBoundingClientRect();
+  const left = Math.min(x, innerWidth - r.width - 8);
+  const top = Math.min(y, innerHeight - r.height - 8);
+  el.style.left = Math.max(8, left) + 'px';
+  el.style.top = Math.max(8, top) + 'px';
+}
+
+/* one menu builder per kind of thing on the board */
+function ctxForDoc(doc, at){
+  const multi = sel.size > 1;
+  const many = () => multi ? sel.size + ' items' : '“' + doc.title + '”';
+  const items = [];
+
+  if (doc.kind === 'note' || doc.kind === 'text'){
+    items.push({ label: doc.kind === 'note' ? 'Edit note' : 'Edit document', key: 'Enter', run: () => focusDoc(doc) });
+    items.push({ label: 'Copy text', run: () => copyDocText(doc) });
+  } else if (doc.kind === 'link'){
+    items.push({ label: 'Open link', run: () => openDoc(doc) });
+    items.push({ label: 'Copy link', run: () => { if (doc.href) navigator.clipboard && navigator.clipboard.writeText(doc.href); } });
+  } else if (doc.kind === 'model'){
+    items.push({ label: 'Frame model', run: () => { const c = cardCanvas(doc); if (c && c.__viewer) c.__viewer.fit(); } });
+    items.push({ label: 'Reset view', run: () => { const c = cardCanvas(doc); if (c && c.__viewer){ c.__viewer.fit(); c.__viewer.schedule(); } } });
+    items.push({ label: 'Wireframe', run: () => toggleWire(doc) });
+  } else if (doc.kind === 'video' || doc.kind === 'audio'){
+    items.push({ label: 'Play / pause', run: () => togglePlay(doc) });
+    items.push({ label: 'Loop', run: () => toggleLoop(doc) });
+    items.push({ label: 'Open player', run: () => openDoc(doc) });
+  } else {
+    items.push({ label: 'Open', key: 'Enter', run: () => openDoc(doc) });
+  }
+  if (doc.blobId) items.push({ label: 'Save a copy…', run: () => downloadDoc(doc) });
+
+  items.push({ sep: true });
+  items.push({ label: 'Cut', key: 'Ctrl+X', run: () => cutSelection(), need: () => sel.size > 0 });
+  items.push({ label: 'Copy', key: 'Ctrl+C', run: () => copySelection(), need: () => sel.size > 0 });
+  items.push({ label: 'Duplicate', key: 'Ctrl+D', run: () => duplicateSelected(), need: () => sel.size > 0 });
+  items.push({ label: multi ? 'Rename first item' : 'Rename…', key: 'F2', run: () => renameDoc(doc) });
+  items.push({ sep: true });
+  items.push({ label: 'Bring to front', key: ']', run: () => bringToFront(), need: () => sel.size > 0 });
+  items.push({ label: 'Send to back', key: '[', run: () => sendToBack(), need: () => sel.size > 0 });
+  items.push({ label: 'Centre on board', key: 'C', run: () => centreSelection(), need: () => sel.size > 0 });
+  items.push({ sep: true });
+  items.push({ label: multi ? 'Delete ' + sel.size + ' items' : 'Delete ' + many(), key: 'Del', danger: true, run: () => removeSelection() });
+  return items;
+}
+
+function ctxForRegion(g){
+  return [
+    { head: g.name },
+    { label: 'Rename region…', run: () => renameRegion(g) },
+    { label: 'Select the cards inside', run: () => {
+        const inner = curShelf().docs.filter(d => d.x + d.w > g.x && d.x < g.x + g.w && d.y + d.h > g.y && d.y < g.y + g.h);
+        selectMany(inner.map(d => d.id));
+      } },
+    { label: 'Fit to this region', run: () => {
+        cam = { x: (g.x + g.w / 2) - SW / 2, y: (g.y + g.h / 2) - SH / 2, z: 1 };
+        stash(); applyCam();
+      } },
+    { sep: true },
+    { label: 'Delete region', danger: true, run: () => {
+        const i = curShelf().groups.indexOf(g);
+        if (i >= 0) curShelf().groups.splice(i, 1);
+        save(); render();
+      } }
+  ];
+}
+
+function ctxForBoard(){
+  const empty = curShelf().docs.length === 0;
+  return [
+    { head: curLevel().name + ' / ' + curShelf().name },
+    { label: 'New note', key: 'N', run: () => newNote() },
+    { label: 'New document', key: 'T', run: () => newText() },
+    { label: 'Paste', key: 'Ctrl+V', need: () => canPaste(), run: () => pasteClipboard() },
+    { sep: true },
+    { label: 'Select all', key: 'Ctrl+A', need: () => !empty, run: () => selectMany(curShelf().docs.map(d => d.id)) },
+    { label: 'Fit board', key: 'F', run: () => fitView() },
+    { label: 'Tidy board', need: () => !empty, run: () => tidyBoard() },
+    { sep: true },
+    { label: 'Zoom in', key: 'Ctrl++', run: () => zoomBy(1.15) },
+    { label: 'Zoom out', key: 'Ctrl+−', run: () => zoomBy(1 / 1.15) },
+    { label: 'Actual size', key: 'Ctrl+0', run: () => zoomActual() },
+    { sep: true },
+    { label: 'Settings…', key: 'S', run: () => openSettings() }
+  ];
+}
+
+/* ------------------------------------------------------------ doc actions */
+function cardEl(doc){ return document.querySelector(`.panel:not(.peek) .obj[data-id="${doc.id}"]`); }
+function cardCanvas(doc){ const el = cardEl(doc); return el ? el.querySelector('canvas.mesh') : null; }
+
+function focusDoc(doc){
+  cam = { x: (doc.x + doc.w / 2) - SW / 2, y: (doc.y + doc.h / 2) - SH / 2, z: Math.max(cam.z, 0.9) };
+  stash(); applyCam();
+  const el = cardEl(doc);
+  const body = el && el.querySelector('.body');
+  if (body){
+    if (doc.kind === 'note' && body.getAttribute('contenteditable') !== 'true') body.setAttribute('contenteditable', 'true');
+    body.focus();
+  }
+}
+
+function docPlainText(doc){
+  const tmp = document.createElement('div');
+  tmp.innerHTML = doc.text || '';
+  return tmp.textContent || '';
+}
+
+function copyDocText(doc){
+  const txt = docPlainText(doc);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt);
+  setSaveState('copied text', 'ok');
+}
+
+function downloadDoc(doc){
+  const url = urls.get(doc.id);
+  if (!url){ setSaveState('no file loaded', 'bad'); return; }
+  const a = document.createElement('a');
+  a.href = url; a.download = doc.title || 'download';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+function openDoc(doc){
+  if (doc.kind === 'link'){
+    const href = doc.href || doc.url;
+    if (href) window.open(href, '_blank', 'noopener');
+    return;
+  }
+  const url = urls.get(doc.id);
+  if (!url){ setSaveState('no file loaded', 'bad'); return; }
+  openLightbox(doc, url);
+}
+
+function togglePlay(doc){
+  const el = cardEl(doc); if (!el) return;
+  const m = el.querySelector('video, audio'); if (!m) return;
+  if (m.paused) m.play(); else m.pause();
+}
+function toggleLoop(doc){
+  const el = cardEl(doc); if (!el) return;
+  const m = el.querySelector('video, audio'); if (!m) return;
+  m.loop = !m.loop;
+  setSaveState('loop ' + (m.loop ? 'on' : 'off'), 'ok');
+}
+function toggleWire(doc){
+  const c = cardCanvas(doc); const v = c && c.__viewer;
+  if (!v) return;
+  v.wire = !v.wire;
+  v.scene.traverse(o => {
+    if (o.isMesh && o.material && !Array.isArray(o.material)) o.material.wireframe = v.wire;
+  });
+  v.schedule && v.schedule();
+  setSaveState('wireframe ' + (v.wire ? 'on' : 'off'), 'ok');
+}
+
+function renameDoc(doc){
+  const el = cardEl(doc); if (!el) return;
+  const span = el.querySelector('.head .title'); if (!span) return;
+  const inp = document.createElement('input');
+  inp.className = 'renamecard';
+  inp.value = doc.title;
+  span.replaceWith(inp);
+  inp.focus(); inp.select();
+  const commit = ok => {
+    if (ok && inp.value.trim()) doc.title = inp.value.trim();
+    save(); render();
+  };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter'){ e.preventDefault(); commit(true); }
+    if (e.key === 'Escape'){ e.preventDefault(); commit(false); }
+    e.stopPropagation();
+  });
+  inp.addEventListener('blur', () => commit(true));
+  inp.addEventListener('mousedown', e => e.stopPropagation());
+  inp.addEventListener('click', e => e.stopPropagation());
+}
+
+function renameRegion(g){
+  const el = document.querySelector(`.group[data-gid="${g.id}"] .grouphead`);
+  if (!el) return;
+  const inp = document.createElement('input');
+  inp.value = g.name; inp.className = 'grename';
+  el.textContent = '';
+  el.appendChild(inp);
+  inp.focus(); inp.select();
+  const commit = ok => { if (ok && inp.value.trim()) g.name = inp.value.trim(); save(); render(); };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter'){ e.preventDefault(); commit(true); }
+    if (e.key === 'Escape'){ e.preventDefault(); commit(false); }
+    e.stopPropagation();
+  });
+  inp.addEventListener('blur', () => commit(true));
+  inp.addEventListener('mousedown', e => e.stopPropagation());
+}
+
+/* --------------------------------------------------------------- lightbox */
+function openLightbox(doc, url){
+  closeLightbox();
+  const wrap = document.createElement('div');
+  wrap.id = 'lightbox';
+  const box = document.createElement('div');
+  box.className = 'lb-box';
+  const title = document.createElement('div');
+  title.className = 'lb-head';
+  title.innerHTML = `<span>${esc(doc.title)}</span><button class="lb-close" title="Close (Esc)">✕</button>`;
+
+  let media;
+  if (doc.kind === 'image') media = `<img src="${url}" alt="">`;
+  else if (doc.kind === 'pdf') media = `<iframe src="${url}"></iframe>`;
+  else if (doc.kind === 'video') media = `<video src="${url}" controls autoplay></video>`;
+  else if (doc.kind === 'audio') media = `<audio src="${url}" controls autoplay style="width:min(640px,80vw)"></audio>`;
+  else media = `<a class="lb-open" href="${url}" target="_blank" rel="noopener">Open ${esc(doc.title)}</a>`;
+
+  box.innerHTML = '';
+  box.appendChild(title);
+  const stage = document.createElement('div');
+  stage.className = 'lb-stage';
+  stage.innerHTML = media;
+  box.appendChild(stage);
+  wrap.appendChild(box);
+  document.body.appendChild(wrap);
+
+  const close = () => closeLightbox();
+  title.querySelector('.lb-close').onclick = close;
+  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+}
+function closeLightbox(){
+  const w = document.getElementById('lightbox');
+  if (!w) return;
+  w.querySelectorAll('video, audio').forEach(m => { try { m.pause(); } catch (e) {} });
+  w.remove();
+}
+
+/* ------------------------------------------------------------- right click */
+document.addEventListener('contextmenu', e => {
+  const inChrome = e.target.closest('#topbar, .tb-tools, #rail, #menubar, .mb-drop, #ctx, #lightbox');
+  // a field that is not part of a card (rail rename, breadcrumb) keeps the native menu
+  const bareField = e.target.closest('input, textarea') && !e.target.closest('.obj');
+  if (inChrome || bareField) return;
+  e.preventDefault();
+
+  // a right-drag that moved was a pan, not a menu
+  if (PAN.moved > 4){ PAN.moved = 0; return; }
+
+  const objEl = e.target.closest('.panel:not(.peek) .obj');
+  const grpEl = e.target.closest('.group');
+
+  if (objEl){
+    const doc = findDoc(objEl.dataset.id);
+    if (!doc) return;
+    if (!sel.has(doc.id)) select(doc.id);      // right-clicking outside a selection moves it
+    openCtx(e.clientX, e.clientY, ctxForDoc(doc));
+    return;
+  }
+  if (grpEl){
+    const g = curShelf().groups.find(x => x.id === grpEl.dataset.gid);
+    if (g) openCtx(e.clientX, e.clientY, ctxForRegion(g));
+    return;
+  }
+  openCtx(e.clientX, e.clientY, ctxForBoard());
+});
+
+/* any press elsewhere, Escape, scroll or resize dismisses the menu */
+window.addEventListener('mousedown', e => {
+  if (ctxEl && !e.target.closest('#ctx')) closeCtx();
+}, true);
+window.addEventListener('keydown', e => { if (e.key === 'Escape'){ closeCtx(); closeLightbox(); } }, true);
+window.addEventListener('blur', closeCtx);
+window.addEventListener('resize', closeCtx);
+window.addEventListener('wheel', closeCtx, { passive: true });
+
 
 boot();
 
@@ -1445,32 +1890,35 @@ function zoomBy(f){
 function zoomActual(){ cam = { ...cam, z: 1 }; stash(); applyCam(); }
 
 function duplicateSelected(){
-  if (!selected) return;
+  const srcs = selDocs();
+  if (!srcs.length) return;
   const s = curShelf();
-  const src = s.docs.find(d => d.id === selected);
-  if (!src) return;
-  const copy = JSON.parse(JSON.stringify(src));
-  copy.id = 'o' + Math.random().toString(36).slice(2, 9);
-  copy.x += 28; copy.y += 28;
-  copy.title = src.title.replace(/(\scopy)?$/, ' copy');
-  copy.blobId = src.blobId;          // content-addressed, so sharing is safe
-  s.docs.push(copy);
-  save(); render(); select(copy.id);
+  const made = [];
+  srcs.forEach(src => {
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = 'o' + Math.random().toString(36).slice(2, 9);
+    copy.x += 28; copy.y += 28;
+    copy.title = src.title.replace(/(\scopy)?$/, ' copy');
+    copy.blobId = src.blobId;        // content-addressed, so sharing is safe
+    s.docs.push(copy);
+    made.push(copy);
+  });
+  save(); render(); selectMany(made.map(d => d.id));
 }
 
 function bringToFront(){
-  if (!selected) return;
-  const s = curShelf(); const i = s.docs.findIndex(d => d.id === selected);
-  if (i < 0) return;
-  const [d] = s.docs.splice(i, 1); s.docs.push(d);
-  save(); render(); select(d.id);
+  const ids = selIds(); if (!ids.length) return;
+  const s = curShelf();
+  const moved = s.docs.filter(d => sel.has(d.id));
+  s.docs = s.docs.filter(d => !sel.has(d.id)).concat(moved);   // keeps their relative order
+  save(); render(); paintSelection();
 }
 function sendToBack(){
-  if (!selected) return;
-  const s = curShelf(); const i = s.docs.findIndex(d => d.id === selected);
-  if (i < 0) return;
-  const [d] = s.docs.splice(i, 1); s.docs.unshift(d);
-  save(); render(); select(d.id);
+  const ids = selIds(); if (!ids.length) return;
+  const s = curShelf();
+  const moved = s.docs.filter(d => sel.has(d.id));
+  s.docs = moved.concat(s.docs.filter(d => !sel.has(d.id)));
+  save(); render(); paintSelection();
 }
 
 /* Pack the board into balanced columns using each card's real size.
@@ -1725,7 +2173,8 @@ const MENUS = [
     { label: 'Paste', key: 'Ctrl+V', run: () => pasteClipboard(), need: () => canPaste() },
     { sep: true },
     { label: 'Duplicate', key: 'Ctrl+D', run: () => duplicateSelected(), need: 'selection' },
-    { label: 'Delete', key: 'Del', run: () => selected && removeDoc(selected), need: 'selection' },
+    { label: 'Select all', key: 'Ctrl+A', run: () => selectMany(curShelf().docs.map(d => d.id)) },
+    { label: 'Delete', key: 'Del', run: () => removeSelection(), need: 'selection' },
     { sep: true },
     { label: 'Rename project', key: 'F2', run: () => renameCurrent('project') },
     { label: 'Rename category', run: () => renameCurrent('category') }
@@ -1788,11 +2237,12 @@ function openExternal(url){
 }
 
 function centreSelection(){
-  if (!selected) return;
-  const d = curShelf().docs.find(x => x.id === selected);
-  if (!d) return;
-  cam.x = -(d.x + d.w / 2 - SW / 2);
-  cam.y = -(d.y + d.h / 2 - SH / 2);
+  const ds = selDocs();
+  if (!ds.length) return;
+  const x0 = Math.min(...ds.map(d => d.x)), x1 = Math.max(...ds.map(d => d.x + d.w));
+  const y0 = Math.min(...ds.map(d => d.y)), y1 = Math.max(...ds.map(d => d.y + d.h));
+  cam.x = -((x0 + x1) / 2 - SW / 2);
+  cam.y = -((y0 + y1) / 2 - SH / 2);
   stash(); applyCam();
 }
 
@@ -1821,7 +2271,7 @@ function openMenu(itemEl, keep){
     if (it.title){ const t = document.createElement('div'); t.className = 'mb-title'; t.textContent = it.title; drop.appendChild(t); return; }
     const row = document.createElement('div');
     row.className = 'mb-row';
-    const blocked = it.need === 'selection' ? !selected
+    const blocked = it.need === 'selection' ? sel.size === 0
                   : (typeof it.need === 'function' ? !it.need() : false);
     if (blocked) row.classList.add('disabled');
     const check = it.check ? (it.check() ? '✓' : '') : '';

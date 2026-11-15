@@ -55,18 +55,47 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy, cut, paste the selected card |
 | `Esc` | close the settings panel, cancel a region, deselect |
 | double-click a note | edit it, click away to save |
-| right-drag | pan the board |
+| click + drag on empty board | draw a selection box; everything it touches is selected |
+| `Ctrl`/`⌘` + click a card | add it to the selection, click again to drop it |
+| `Shift` + click a card | add it to the selection without toggling |
+| `Ctrl+A` | select every card on the board |
+| right-drag on empty board | pan the board |
 | wheel | zoom; over a scrollable document or a model, it scrolls or zooms that instead |
 | double-click a model | nothing — drag to orbit, wheel to zoom |
 
 Regions get moved by their label, resized by their corner handles, renamed by double-clicking the label, and deleted with the ✕ inside it.
+
+### Selecting
+
+One click selects a card. `Ctrl`-click (or `⌘`-click) adds or removes one card, `Shift`-click adds without toggling, and dragging a box on empty board selects everything the box touches — the way the desktop picks up icons. Dragging any card in a selection moves the whole set, and Delete, Cut, Copy, Duplicate, Bring to front, Send to back and Centre all work on the selection rather than on one card.
+
+The board itself moves with **right-drag on empty canvas** only, so the left button is free for selecting and moving cards.
+
+![Drag a box to select](docs/selecting.png)
+
+### Right-click menus
+
+Right-clicking a card, a region or empty board opens a menu built for that thing:
+
+- **notes** — edit, copy the text, then cut/copy/duplicate/rename/z-order/delete
+- **documents** — edit, copy the text, save a copy
+- **images, PDFs, plain files** — open in a viewer over the board, save a copy
+- **3D models** — frame the model, reset the view, toggle wireframe
+- **video and audio** — play/pause, loop, open the player
+- **links** — open, copy the link
+- **regions** — rename, select the cards inside, fit to the region, delete
+- **empty board** — new note or document, paste, select all, fit, tidy, zoom, settings
+
+Every card menu also carries the clipboard and arrangement commands with their shortcuts shown on the right.
+
+![The menu for a 3D model](docs/context-menu.png)
 
 ## The menu bar
 
 File, Edit, Preferences, View, Arrange, Extras and Help, along the top of the window — `Alt` + the first letter opens one, arrows walk it, `Enter` runs it.
 
 - **File** — new note or document, import files, place from a URL, open a `.nks` board, export this board or the whole tower, quit
-- **Edit** — duplicate, delete, rename the project or the category
+- **Edit** — undo, redo, cut, copy, paste, duplicate, select all, delete, rename the project or the category
 - **Preferences** — preferences panel, theme, text size, export/import settings
 - **View** — fit, zoom in/out/actual size, board grid, reduce motion, show sidebar
 - **Arrange** — bring to front, send to back, tidy the board, centre the selection
