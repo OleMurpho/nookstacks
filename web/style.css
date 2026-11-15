@@ -379,3 +379,13 @@ body.drawmode #stage *{cursor:crosshair}
 #sheet td:first-child{font-family:JB,monospace; font-size:11.5px; color:var(--amber); width:150px}
 #sheet .about p{margin:0 0 10px; font-size:13.5px; line-height:1.6; color:var(--text)}
 #sheet .about .ver{font-family:JB,monospace; font-size:11px; color:var(--dim)}
+
+::selection{background:rgba(var(--amber-rgb),.32); color:inherit}
+
+/* in-place rename: the label becomes a field of the same size and weight */
+.ritem input{all:unset; flex:1; font:inherit; color:var(--chip-ink); background:rgba(var(--white-rgb),.09);
+  border-radius:3px; padding:1px 5px; margin:-2px 0; outline:1px solid rgba(var(--amber-rgb),.45)}
+#crumb .crumbedit{all:unset; font:inherit; color:var(--amber-bright, var(--amber));
+  background:rgba(var(--amber-rgb),.12); border-radius:3px; padding:1px 5px;
+  outline:1px solid rgba(var(--amber-rgb),.45); min-width:70px}
+#crumb #levelName, #crumb #projectName{cursor:text}

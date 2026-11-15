@@ -701,26 +701,65 @@ function renderRail(){
     `<div class="ritem ${i===shelf?'on':''}" data-kind="proj" data-i="${i}">
        <span class="nm">${esc(s.name)}</span>
        <span class="mv"><button data-mv="up">↑</button><button data-mv="down">↓</button></span></div>`).join('');
-  wireRail($('#catList'));
-  wireRail($('#projList'));
+  wireRail();
 }
 
-function wireRail(box){
-  box.querySelectorAll('.ritem').forEach(row => {
-    const kind = row.dataset.kind, i = +row.dataset.i;
-    row.addEventListener('click', e => {
-      if (e.target.closest('.mv') || e.target.tagName === 'INPUT') return;
+/* Delegated, and bound once. Per-row listeners died the moment a click
+   re-rendered the rail, which is why double-clicking a project you were not
+   already on never opened the rename box: the first click rebuilt the row, so
+   the browser delivered the dblclick to the list instead of the label. */
+let railWired = false;
+function wireRail(){
+  if (railWired) return;
+  railWired = true;
+  ['#catList', '#projList'].forEach(sel => {
+    const box = $(sel);
+    if (!box) return;
+
+    // Two quick clicks on the same row is the rename gesture, detected here
+    // rather than trusted to dblclick: the first click re-renders the rail, and
+    // a dblclick whose two targets are different nodes is delivered to their
+    // common ancestor, so a handler on the label would never see it.
+    let last = { kind: '', i: -1, t: 0 };
+    box.addEventListener('click', e => {
+      const mv = e.target.closest('.mv button');
+      if (mv){
+        e.stopPropagation();
+        const row = mv.closest('.ritem');
+        moveItem(row.dataset.kind, +row.dataset.i, mv.dataset.mv === 'up' ? -1 : 1);
+        return;
+      }
+      if (e.target.tagName === 'INPUT') return;
+      const row = e.target.closest('.ritem');
+      if (!row) return;
+      const i = +row.dataset.i, kind = row.dataset.kind;
+      const now = Date.now();
+
+      if (last.kind === kind && last.i === i && now - last.t < 450){
+        last = { kind: '', i: -1, t: 0 };
+        if (!row.querySelector('input')) startRename(row, kind, i);
+        return;
+      }
+      last = { kind, i, t: now };
+
       if (kind === 'cat') goLevel(i); else goShelf(i);
     });
-    row.querySelector('.nm').addEventListener('dblclick', e => { e.stopPropagation(); startRename(row, kind, i); });
-    row.querySelectorAll('.mv button').forEach(b => b.addEventListener('click', e => {
-      e.stopPropagation(); moveItem(kind, i, b.dataset.mv === 'up' ? -1 : 1);
-    }));
+
+    // native dblclick still works where the browser delivers it to the label
+    box.addEventListener('dblclick', e => {
+      if (e.target.tagName === 'INPUT') return;
+      const row = e.target.closest('.ritem');
+      if (!row || !e.target.closest('.nm') || row.querySelector('input')) return;
+      e.preventDefault(); e.stopPropagation();
+      startRename(row, row.dataset.kind, +row.dataset.i);
+    });
   });
 }
 
 function startRename(row, kind, i){
+  cancelNav();
   const nm = row.querySelector('.nm');
+  if (!nm) return;
   const arr = kind === 'cat' ? db.levels : curLevel().shelves;
   const inp = document.createElement('input');
   inp.value = arr[i].name;
@@ -980,12 +1019,25 @@ function goShelf(i){
   stash(); shelf = i; cam = { ...(curShelf().pan || {x:0,y:0,z:1}) };
   selected = null; render();
 }
+let navTimer = 0;
+/* A rename starting mid-transition would be wiped by the render this schedules,
+   so the pending switch is cancelled when the second click turns a label into a
+   text box — you asked to rename the category, not to travel into it. */
+function cancelNav(){
+  if (!navTimer) return;
+  clearTimeout(navTimer); navTimer = 0;
+  const w = $('#world');
+  w.style.transition = 'opacity .2s ease';
+  w.style.opacity = '1';
+}
+
 function goLevel(i){
   if (i < 0 || i >= db.levels.length || i === level) return;
-  const w = $('#world'), dir = i > level ? 1 : -1;
+  const w = $('#world');
   w.style.transition = 'transform .26s ease, opacity .26s ease';
   w.style.opacity = '0';
-  setTimeout(() => {
+  navTimer = setTimeout(() => {
+    navTimer = 0;
     level = i; shelf = 0; selected = null;
     cam = { ...(curShelf().pan || {x:0,y:0,z:1}) };
     render();
@@ -1820,5 +1872,47 @@ function buildMenus(){
     if (e.key === 'Escape'){ closeMenus(); closeSheet(); }
   });
 }
+/* the breadcrumb is the other place a project is named, so it renames too */
+function wireCrumb(){
+  const lvl = document.getElementById('levelName');
+  const proj = document.getElementById('projectName');
+  if (!lvl || !proj) return;
+
+  const rename = (which) => {
+    const target = which === 'cat' ? lvl : proj;
+    const i = which === 'cat' ? level : shelf;
+    const arr = which === 'cat' ? db.levels : curLevel().shelves;
+    if (!arr[i]) return;
+    const inp = document.createElement('input');
+    inp.className = 'crumbedit';
+    inp.value = arr[i].name;
+    target.replaceWith(inp);
+    inp.focus(); inp.select();
+    const commit = ok => {
+      if (ok && inp.value.trim()) arr[i].name = inp.value.trim();
+      save(); render();
+    };
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter'){ e.preventDefault(); commit(true); }
+      if (e.key === 'Escape'){ e.preventDefault(); commit(false); }
+      e.stopPropagation();
+    });
+    inp.addEventListener('blur', () => commit(true));
+  };
+
+  let lastT = 0, lastWhich = '';
+  const hit = (which) => e => {
+    e.preventDefault();
+    const now = Date.now();
+    if (lastWhich === which && now - lastT < 450){ lastWhich = ''; rename(which); }
+    else { lastT = now; lastWhich = which; }
+  };
+  lvl.addEventListener('dblclick', () => rename('cat'));
+  proj.addEventListener('dblclick', () => rename('proj'));
+  lvl.addEventListener('click', hit('cat'));
+  proj.addEventListener('click', hit('proj'));
+}
+wireCrumb();
+
 buildMenus();
 window.__nookstacksMenu = { menus: MENUS, open: () => mbOpen, exportNks, importNks, tidyBoard, showShortcuts, showAbout };

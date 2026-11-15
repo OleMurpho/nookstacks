@@ -49,6 +49,7 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 | `←` `→` | change project |
 | `N` | new note where the cursor is |
 | `G` | draw a region around things |
+| double-click a category or project name | rename it in place — `Enter` keeps, `Esc` cancels |
 | `S` | open settings |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | undo / redo (80 steps) |
 | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy, cut, paste the selected card |
