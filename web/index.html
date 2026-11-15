@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tartaros</title>
+<link rel="stylesheet" href="style.css?v=3">
+<script type="importmap">
+{ "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/jsm/",
+    "fzstd": "./vendor/fzstd.mjs"
+} }
+</script>
+</head>
+<body>
+<div id="stage">
+  <div id="cylinder"></div>
+
+  <header id="topbar">
+    <div id="crumb"><span id="levelName">—</span><span class="sep">/</span><span id="projectName">—</span></div>
+    <div class="tb-tools">
+      <button data-tool="note" title="New note (N)"><i>▤</i>Note</button>
+      <button data-tool="text" title="New document (T)"><i>≡</i>Document</button>
+      <button data-tool="import" title="Place files from your computer"><i>⬆</i>Import</button>
+      <button data-tool="url" title="Place an image, model or link from the web"><i>⌘</i>From URL</button>
+      <span class="tb-div"></span>
+      <button data-tool="region" title="Draw a region around things (G)"><i>▢</i>Region</button>
+      <button data-tool="fit" title="Fit this project (F)"><i>⤢</i>Fit</button>
+      <button data-tool="delete" id="btnDelete" disabled title="Delete selection (Del)"><i>✕</i>Delete</button>
+    </div>
+    <div id="saveState" class="savestate" title="where this board is stored">connecting…</div>
+    <div id="counts"></div>
+  </header>
+
+  <aside id="rail">
+    <div class="railhead">Categories</div>
+    <div id="catList"></div>
+    <button id="addCat" class="railadd" title="Add category">+</button>
+    <div class="railhead second">Projects</div>
+    <div id="projList"></div>
+    <button id="addProj" class="railadd" title="Add project">+</button>
+  </aside>
+  <div id="world"></div>
+  <button id="navPrev" class="navarrow left" hidden title="Previous project">‹</button>
+  <button id="navNext" class="navarrow right" hidden title="Next project">›</button>
+  <div id="empty" hidden>
+    <p>Nothing on this shelf yet.</p>
+    <p class="sub">Import a file, drop one onto the board, or press <b>N</b> to write.</p>
+  </div>
+
+  <input id="fileinput" type="file" multiple hidden>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

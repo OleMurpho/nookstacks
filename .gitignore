@@ -1,0 +1,11 @@
+# rust build output
+src-tauri/target/
+src-tauri/gen/
+
+# the vault is your data, never the repo's
+vault/
+*.tmp
+
+# editor / OS noise
+.DS_Store
+node_modules/
