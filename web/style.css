@@ -482,3 +482,7 @@ body.drawmode #stage *{cursor:crosshair}
 .ctx-row .sw-dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px;
   vertical-align:middle; box-shadow:inset 0 0 0 1px rgba(var(--black-rgb),.35)}
 .ctx-row.has-sub{padding-right:6px}
+
+/* nothing is drawn until the board is known: no flash of the wrong board */
+body.booting #world { visibility: hidden; }
+body.booting #cylinder { visibility: hidden; }

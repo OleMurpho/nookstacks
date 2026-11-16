@@ -78,7 +78,7 @@ function seed(){
   const demo = (kind, title, file, ext, x, y, w, h, extra = {}) =>
     mk(kind, title, x, y, w, h, { src: 'demo/' + file, ext, size: 0, ...extra });
 
-  return { levels: [
+  return { demo: true, demoVersion: DEMO_VERSION, levels: [
     { id:'ex1', name:'Example Category 1', shelves:[
       { id:'ex1s1', name:'Example Project 1', pan:{x:0,y:0,z:1}, groups:[
           { id:'g1', name:'START HERE', x:40, y:40, w:790, h:620, color:'amber' },
@@ -248,6 +248,7 @@ const vault = {
   }
 };
 
+const DEMO_VERSION = 2;
 let db = seed();
 
 /* ---------------------------------------------------------------- settings */
@@ -488,6 +489,12 @@ async function boot(){
       const res = await vault.getState();
       if (res && res.state && res.state.levels && res.state.levels.length){
         db = res.state;
+        // a stored board that is an older copy of the demo is nobody's work:
+        // move it forward instead of leaving last month's example on screen
+        if (db.demo && (db.demoVersion || 0) < DEMO_VERSION){
+          db = seed();
+          dirtyAfterBoot = true;
+        }
         setSaveState((vault.kind === 'local' ? 'this browser · ' : 'vault · ') +
           (res.saved ? new Date(res.saved).toLocaleString() : 'loaded'), 'ok');
         if (DESKTOP && vault.path) document.getElementById('saveState').title = vault.path;
@@ -509,6 +516,7 @@ async function boot(){
   if (!db.settings){ db.settings = { ...DEFAULT_SETTINGS }; dirtyAfterBoot = true; }
   applySettings();
   render();
+  document.body.classList.remove('booting');
   if (dirtyAfterBoot){ dirtyAfterBoot = false; save(); }
 }
 
@@ -2208,6 +2216,7 @@ window.addEventListener('resize', closeCtx);
 window.addEventListener('wheel', closeCtx, { passive: true });
 
 
+document.body.classList.add('booting');
 boot();
 
 
