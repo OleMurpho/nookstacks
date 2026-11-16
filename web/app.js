@@ -75,35 +75,61 @@ const localVault = {
 /* ---------------------------------------------------------------- seed */
 function seed(){
   const mk = (kind, title, x, y, w, h, extra = {}) => ({ id: 'o' + Math.random().toString(36).slice(2, 9), kind, title, x, y, w, h, ...extra });
+  const demo = (kind, title, file, ext, x, y, w, h, extra = {}) =>
+    mk(kind, title, x, y, w, h, { src: 'demo/' + file, ext, size: 0, ...extra });
+
   return { levels: [
-    { id:'studio', name:'Studio', shelves:[
-      { id:'aurora', name:'Aurora', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g1', name:'DESIGN', x:220, y:215, w:700, h:280, color:'sky' },
-          { id:'g2', name:'BUILD', x:950, y:215, w:370, h:280, color:'rose' },
-          { id:'g3', name:'DOCS', x:220, y:530, w:800, h:280, color:'mint' } ],
+    { id:'ex1', name:'Example Category 1', shelves:[
+      { id:'ex1s1', name:'Example Project 1', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g1', name:'START HERE', x:40, y:40, w:790, h:620, color:'amber' },
+          { id:'g2', name:'DOCUMENTS', x:860, y:40, w:980, h:620, color:'sky' },
+          { id:'g3', name:'MEDIA', x:40, y:700, w:1100, h:620, color:'violet' },
+          { id:'g4', name:'ODDS AND ENDS', x:1170, y:700, w:670, h:620, color:'mint' } ],
         docs:[
-          mk('note','Kickoff', 250, 250, 300, 160, { text:'<p>Scope settled: three deliverables, one review a fortnight.</p>' }),
-          mk('text','spec.md', 600, 250, 340, 215, { text:'# Goals\n\n- First build by Friday\n- API stays under 200 ms\n\nTwo reviewers per change.' }),
-          mk('note','Open questions', 980, 250, 300, 175, { text:'<p>Do we need offline mode in v1? Settle it before the design review.</p>' }),
-          mk('note','Week one', 250, 560, 320, 180, { text:'<p>Wireframes approved on Monday. The copy still needs a second pass.</p>' }),
-          mk('text','release-notes.md', 640, 600, 340, 190, { text:'## 1.4\n\n- Faster first paint\n- Fixed the export dialog\n- A smaller installer' })
+          /* --- the tutorial, as ordinary notes on the board --- */
+          mk('note','1 · This is a demo', 80, 90, 340, 200, { text:'<p>Everything here is an example. Rename it, drag it, delete it — nothing on this board is precious.</p>' }),
+          mk('note','2 · Drag a card by its tab', 440, 90, 360, 200, { text:'<p>Grab the strip at the top of a card. The body stays put so you can click and edit inside it.</p>' }),
+          mk('note','3 · Regions group things', 80, 330, 340, 300, { text:'<p>A region is a coloured frame around part of a board — like these four. Drag its tab to move it; the contents do not follow unless you select them too.</p><p>Right-click a region tab for its colour, or to fit the board to it.</p>' }),
+          mk('note','4 · Your board is a file', 440, 330, 360, 300, { text:'<p>Notes, documents and every attached file live in one vault folder. Nothing leaves the machine.</p><p>Press <b>S</b> for settings and themes, <b>?</b> for every shortcut.</p>' }),
+
+          /* --- one of everything --- */
+          demo('text','notes.md','notes.md','md', 900, 90, 320, 240),
+          demo('text','hello.py','hello.py','py', 1240, 90, 300, 240),
+          demo('text','data.csv','data.csv','csv', 1560, 90, 250, 240),
+          demo('pdf','example-sheet.pdf','example-sheet.pdf','pdf', 900, 370, 430, 260),
+          demo('image','board-render.png','board-render.png','png', 1360, 370, 440, 260),
+
+          demo('video','example-clip.mp4','example-clip.mp4','mp4', 80, 750, 500, 330),
+          demo('audio','example-tone.mp3','example-tone.mp3','mp3', 620, 750, 480, 160),
+          demo('model','rogue.obj','rogue.obj','obj', 620, 950, 480, 320),
+
+          demo('link','example.com','','', 1210, 750, 590, 300, { url:'https://example.com' }),
+          demo('file','example.zip','example.zip','zip', 1210, 1090, 320, 170, { size: 177 })
         ] },
-      { id:'beacon', name:'Beacon', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g4', name:'NOTES', x:70, y:100, w:540, h:400, color:'violet' } ],
-        docs:[ mk('note','First sketch', 96, 150, 260, 160, { text:'<p>One board per project, nothing hidden behind a menu.</p>' }) ] },
-      { id:'atlas', name:'Atlas', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g5', name:'ARCHIVE', x:70, y:100, w:540, h:400, color:'amber' } ],
-        docs:[ mk('note','Older drafts', 96, 150, 300, 170, { text:'<p>Superseded designs, kept for reference.</p>' }) ] }
+      { id:'ex1s2', name:'Example Project 2', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g5', name:'A SECOND BOARD', x:60, y:60, w:700, h:420, color:'rose' } ],
+        docs:[
+          mk('note','Every project gets its own infinite board', 100, 110, 380, 220, { text:'<p>Nothing is shared between boards. Move around with the arrow keys, or click a project in the rail.</p>' }),
+          mk('note','Right-click anything', 520, 110, 200, 220, { text:'<p>A note, a model and a region each get their own menu.</p>' })
+        ] },
+      { id:'ex1s3', name:'Example Project 3', pan:{x:0,y:0,z:1}, groups:[],
+        docs:[ mk('note','An empty-ish board', 120, 120, 340, 180, { text:'<p>Press <b>N</b> for a note, <b>T</b> for a document, <b>G</b> to draw a region.</p>' }) ] }
     ]},
-    { id:'product', name:'Product', shelves:[
-      { id:'lumen', name:'Lumen', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g6', name:'PLAN', x:70, y:100, w:540, h:400, color:'sky' } ],
-        docs:[ mk('text','roadmap.txt', 96, 150, 280, 200, { text:'Q1  ship the editor\nQ2  sharing\nQ3  mobile reader' }) ] }
+    { id:'ex2', name:'Example Category 2', shelves:[
+      { id:'ex2s1', name:'Example Project 4', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g6', name:'THEMES', x:60, y:60, w:760, h:460, color:'violet' } ],
+        docs:[
+          mk('note','Sixteen themes, or build your own', 100, 110, 380, 260, { text:'<p>Press <b>S</b>. Every surface is drawn from one set of colour tokens, so a theme is a palette swap.</p><p>Custom lets you pick five colours and derives the rest.</p>' }),
+          mk('note','Text size, grid, motion', 520, 110, 270, 260, { text:'<p>Same panel. Reduce motion also honours your system setting.</p>' })
+        ] }
     ]},
-    { id:'archive', name:'Archive', shelves:[
-      { id:'notes', name:'Notes', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g7', name:'READING', x:70, y:100, w:540, h:400, color:'mint' } ],
-        docs:[ mk('text','reading.md', 96, 150, 360, 280, { text:'# Reading\n\n- The Design of Everyday Things\n- Thinking in Systems' }) ] }
+    { id:'ex3', name:'Example Category 3', shelves:[
+      { id:'ex3s1', name:'Example Project 5', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g7', name:'BOARDS AS FILES', x:60, y:60, w:820, h:520, color:'mint' } ],
+        docs:[
+          mk('note','.nks bundles', 100, 110, 380, 300, { text:'<p>File → Export this board writes a <b>.nks</b> file: the board, its cards and every attached file, in one zip.</p><p>Open board reads one back. It is how you move a project between machines.</p>' }),
+          mk('note','Portable by design', 520, 110, 320, 300, { text:'<p>Paths never appear in the bundle — files are addressed by content hash, so a board exported on Windows opens on Linux.</p>' })
+        ] }
     ]}
   ]};
 }
@@ -508,18 +534,22 @@ function screenToPanel(px, py){
 /* ---------------------------------------------------------------- objects */
 function blobUrlFor(doc){
   if (urls.has(doc.id)) return urls.get(doc.id);
-  const u = doc.blobId ? `__pending__${doc.id}` : null;
+  const u = (doc.blobId || doc.src) ? `__pending__${doc.id}` : null;
   if (u) resolveBlobUrl(doc);
   return urls.get(doc.id) || null;
 }
 async function resolveBlobUrl(doc){
   let blob = null;
-  if (vault.ok){
+  if (doc.blobId && vault.ok){
     try { blob = await vault.getBlob(doc.blobId); } catch {}
   }
-  if (!blob){
+  if (!blob && doc.blobId){
     const rec = await idb.get(doc.blobId);
     if (rec) blob = rec.blob;
+  }
+  // demo cards ship their file beside the app instead of in the vault
+  if (!blob && doc.src){
+    try { const r = await fetch(doc.src); if (r.ok) blob = await r.blob(); } catch {}
   }
   if (!blob) return;
   urls.set(doc.id, URL.createObjectURL(blob));
@@ -560,8 +590,10 @@ function bodyHTML(doc){
       return `<div class="body"><canvas class="mesh"></canvas><span class="viewerhint">drag orbit · scroll zoom</span></div>`;
     case 'link':
       return `<div class="body"><iframe src="${esc(doc.url || 'about:blank')}" referrerpolicy="no-referrer"></iframe></div>`;
-    default:
-      return `<div class="body"><div class="filletile">${esc(doc.ext || 'file')} · ${(doc.size/1024||0).toFixed(0)} KB<br><br>${urls.get(doc.id) ? `<a href="${urls.get(doc.id)}" download="${esc(doc.title)}">download</a>` : 'stored locally'}</div></div>`;
+    default: {
+      const kb = (doc.size || 0) / 1024;
+      const size = !doc.size ? '' : kb >= 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb >= 1 ? Math.round(kb) + ' KB' : doc.size + ' B';
+      return `<div class="body"><div class="filletile">${esc(doc.ext || 'file')} · ${size}<br><br>${urls.get(doc.id) ? `<a href="${urls.get(doc.id)}" download="${esc(doc.title)}">download</a>` : 'stored locally'}</div></div>`; }
   }
 }
 
@@ -776,7 +808,7 @@ function render(){
   world.querySelectorAll('.panel:not(.peek) .obj').forEach(el => {
     const doc = findDoc(el.dataset.id);
     if (!doc) return;
-    if (doc.blobId && !urls.has(doc.id)) resolveBlobUrl(doc);
+    if ((doc.blobId || doc.src) && !urls.has(doc.id)) resolveBlobUrl(doc);
     wireBody(el, doc);
     wireHead(el, doc);
     wireHandles(el, doc);
@@ -1020,6 +1052,15 @@ function wireBody(el, doc){
       body.setAttribute('contenteditable', 'false');
       doc.text = body.innerHTML; save();
     });
+  }
+  if (doc.kind === 'video'){
+    // paint the first frame instead of leaving the card black until play
+    const v = body.querySelector('video');
+    if (v){
+      const seek = () => { if (v.currentTime === 0 && v.duration) { try { v.currentTime = Math.min(0.06, v.duration / 2); } catch {} } };
+      v.addEventListener('loadedmetadata', seek);
+      if (v.readyState >= 1) seek();
+    }
   }
   if (doc.kind === 'text'){
     const ta = body.querySelector('textarea');

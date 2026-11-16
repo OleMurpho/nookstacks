@@ -6,6 +6,12 @@ Categories stack into projects, projects open onto an infinite board, and the bo
 holds whatever the work actually is — notes, documents, drawings, PDFs, 3D models,
 audio, links, and the coloured regions that group them.
 
+## Try it first
+
+**[nookstacks.io](https://nookstacks.io)** — the whole app in a browser tab, no install.
+It opens on a demo board (Example Category 1 → Example Project 1) with one of every
+kind of card, and whatever you do there is kept in your own browser, never uploaded.
+
 ![The board](docs/screenshot.png)
 
 ## What's in it

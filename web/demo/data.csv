@@ -1,0 +1,4 @@
+step,seconds,note
+warm up,12,steady
+hold,45,under load
+cool down,20,fans at 60%
