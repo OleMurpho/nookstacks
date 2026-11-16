@@ -72,6 +72,40 @@ jobs:
           find dist -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.exe' -o -name '*.msi' \) -exec cp {} out/ \;
           ls -la out
 
+      - name: Build the update manifest
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          files = os.listdir('out')
+          def pick(pred):
+              for f in sorted(files):
+                  if pred(f):
+                      return f
+          win = pick(lambda f: f.endswith('.exe') and 'setup' in f)
+          lin = pick(lambda f: f.endswith('.AppImage'))
+          tag = os.environ['GITHUB_REF_NAME']
+          version = tag.lstrip('v')
+          base = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/{tag}/"
+          def entry(name):
+              path = os.path.join('out', name)
+              data = open(path, 'rb').read()
+              return {"url": base + name,
+                      "sha256": hashlib.sha256(data).hexdigest(),
+                      "size": len(data)}
+          manifest = {
+              "version": version,
+              "notes": f"Nookstacks {version}",
+              "assets": {},
+          }
+          if win:
+              manifest["assets"]["windows-x86_64"] = entry(win)
+          if lin:
+              manifest["assets"]["linux-x86_64"] = entry(lin)
+          with open('out/latest.json', 'w') as fh:
+              json.dump(manifest, fh, indent=2)
+          print(open('out/latest.json').read())
+          PY
+
       - uses: softprops/action-gh-release@v2
         with:
           files: out/*

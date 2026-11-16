@@ -26,6 +26,20 @@ own browser, never uploaded.
 - **Boards travel** — *File → Export* writes a `.nks` bundle: the board, its regions and every file on it, in one zip. *Open board* reads it back. The desktop app asks where to save; the browser downloads it.
 - **Fits the screen you have** — a collapsible rail on desktop and tablet (`Ctrl+B`, or the thin bar it leaves behind), and on a phone the rail becomes a drawer, one finger pans, two pinch, and a long press opens the menu.
 
+## Updating
+
+The desktop app updates itself. **Preferences → Check for updates…** asks the newest
+release what it has, downloads the installer for this platform, checks it against the
+sha256 published with that release, runs it and reopens Nookstacks on the new version.
+
+- **Windows** — the per-user NSIS setup, silently. No admin prompt, no uninstall first.
+- **Linux** — an AppImage replaces itself in place. A `.deb`/`.rpm` install cannot, and
+  the panel says so instead of failing.
+- **Web** — nothing to do. A reload is the update.
+
+`nookstacks --update-now` does the same without opening a window and writes each step to
+`updater.log` beside the vault, which is how the release check verifies the path.
+
 ## Starting empty, with templates
 
 Nothing is created for you. The first board is blank, with one empty project and a card

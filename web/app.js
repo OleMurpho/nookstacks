@@ -705,7 +705,90 @@ function wireCustomEditor(){
 }
 function setSetting(key, value){ settings()[key] = value; applySettings(); save(); }
 const settingsOpen = () => !document.getElementById('settings').hidden;
-function openSettings(){ document.getElementById('settings').hidden = false; paintSettings(); }
+function openSettings(){ document.getElementById('settings').hidden = false; paintSettings(); initUpdates(); }
+
+/* ---------------------------------------------------------------- updates
+   The desktop app updates itself: ask the release manifest, download the
+   installer for this platform, check its checksum, run it and reopen. The web
+   build cannot replace itself, so it offers a reload instead of pretending. */
+let updState = { version: '', latest: null, busy: false };
+
+function updMsg(html, kind){
+  const el = document.getElementById('updMsg');
+  if (!el) return;
+  el.innerHTML = html;
+  el.dataset.kind = kind || '';
+}
+
+async function initUpdates(){
+  const v = document.getElementById('appVersion');
+  if (!DESKTOP){
+    if (v) v.textContent = 'web build';
+    updMsg('The web version updates itself. A reload picks up the newest build.', '');
+    const check = document.getElementById('updCheck');
+    if (check){ check.textContent = 'Reload'; check.onclick = () => location.reload(); }
+    return;
+  }
+  const check = document.getElementById('updCheck');
+  if (check) check.onclick = checkUpdates;
+  const go = document.getElementById('updGo');
+  if (go) go.onclick = installUpdate;
+  if (updState.version && v){ v.textContent = updState.version; return; }
+  try {
+    const st = await call('update_state');
+    updState.version = st.version;
+    if (v) v.textContent = st.version;
+  } catch (e){ if (v) v.textContent = 'desktop'; }
+}
+
+async function checkUpdates(){
+  if (updState.busy) return;
+  updState.busy = true;
+  updMsg('Checking for updates…', '');
+  try {
+    const r = await call('update_check');
+    updState.latest = r.latest;
+    if (!r.newer){
+      updMsg('This is the newest version (' + esc(r.current) + ').', 'ok');
+      document.getElementById('updGo').hidden = true;
+    } else {
+      const mb = r.size ? ' · ' + (r.size / 1048576).toFixed(1) + ' MB' : '';
+      updMsg('<b>' + esc(r.latest) + '</b> is available' + mb +
+        (r.notes ? '<br><span class="updnote">' + esc(r.notes) + '</span>' : ''), 'new');
+      document.getElementById('updGo').hidden = false;
+    }
+  } catch (e){
+    updMsg('Could not check: ' + esc(String(e && e.message || e)), 'bad');
+  } finally { updState.busy = false; }
+}
+
+async function installUpdate(){
+  if (updState.busy) return;
+  updState.busy = true;
+  const bar = document.getElementById('updBar');
+  const fill = document.getElementById('updFill');
+  const go = document.getElementById('updGo');
+  go.hidden = true;
+  bar.hidden = false;
+  fill.style.width = '0%';
+
+  try {
+    const listen = TAURI && TAURI.event && TAURI.event.listen;
+    if (listen){
+      await listen('update:progress', ev => { fill.style.width = (ev.payload|0) + '%'; });
+      await listen('update:installing', () => {
+        updMsg('Installing ' + esc(String(updState.latest || '')) + ' — Nookstacks will reopen by itself.', 'new');
+      });
+    }
+    updMsg('Downloading…', '');
+    await call('update_install');
+    updMsg('Installer started. Nookstacks will close and reopen on the new version.', 'ok');
+  } catch (e){
+    bar.hidden = true;
+    go.hidden = false;
+    updMsg('Update failed: ' + esc(String(e && e.message || e)), 'bad');
+  } finally { updState.busy = false; }
+}
 function openTemplates(){ document.getElementById('templates').hidden = false; paintTemplates(); }
 function closeTemplates(){ document.getElementById('templates').hidden = true; }
 
@@ -3182,6 +3265,7 @@ const MENUS = [
   ]},
   { label: 'Preferences', items: [
     { label: 'Preferences…', key: 'S', run: () => openSettings() },
+    { label: 'Check for updates…', run: () => { openSettings(); initUpdates(); checkUpdates(); } },
     { sep: true },
     { title: 'Theme' },
     ...THEMES.map(t => ({ label: t.name, check: () => settings().theme === t.id,

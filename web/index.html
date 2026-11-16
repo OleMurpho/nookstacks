@@ -28,7 +28,7 @@
 <meta name="twitter:description" content="Notes, documents, images, PDFs, video, audio and 3D models on one canvas. Local-first.">
 <meta name="twitter:image" content="https://nookstacks.io/og.png">
 
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 <link rel="stylesheet" href="viewers.css?v=2">
 <link rel="stylesheet" href="templates.css?v=3">
 <link rel="stylesheet" href="themes.css?v=2">
@@ -145,7 +145,11 @@
 
       <div class="sgroup">
         <div class="srow"><span>Board data</span><button class="linkbtn" id="vaultBtn">Open folder</button></div>
-        <div class="srow"><span>Version</span><span class="ver">0.1.0</span></div>
+        <div class="srow"><span>Version</span><span class="ver" id="appVersion">—</span></div>
+        <div class="srow"><span>Updates</span><button class="linkbtn" id="updCheck">Check for updates</button></div>
+        <p class="updmsg" id="updMsg"></p>
+        <div class="updbar" id="updBar" hidden><i id="updFill"></i></div>
+        <div class="updgo"><button class="ghostbtn primary" id="updGo" hidden>Install and restart</button></div>
       </div>
 
       <footer><button class="ghostbtn" id="settingsReset">Reset to defaults</button></footer>
@@ -158,6 +162,6 @@
 <script src="viewers-data.js?v=1"></script>
 <script src="viewers-media.js?v=1"></script>
 <script src="viewers-doc.js?v=1"></script>
-<script type="module" src="app.js?v=21"></script>
+<script type="module" src="app.js?v=22"></script>
 </body>
 </html>

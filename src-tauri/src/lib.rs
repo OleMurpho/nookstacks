@@ -5,6 +5,7 @@
 // `vault`, which is unit-tested without a window.
 
 mod nks;
+mod update;
 mod vault;
 
 use serde::Serialize;
@@ -154,6 +155,16 @@ fn open_url(url: String) -> Result<(), String> {
 pub fn run() {
     let _ = vault::current().ensure_dirs();
 
+    // `nookstacks --update-now` updates without a window, and says what it did
+    // in <vault>/../updater.log. The release check uses it; so can a user.
+    if std::env::args().any(|a| a == "--update-now") {
+        match update::install_blocking() {
+            Ok(msg) => eprintln!("nookstacks: {msg}"),
+            Err(e) => eprintln!("nookstacks: update failed: {e}"),
+        }
+        std::process::exit(0);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -185,7 +196,10 @@ pub fn run() {
             export_nks,
             import_nks,
             open_url,
-            quit_app
+            quit_app,
+            update::update_state,
+            update::update_check,
+            update::update_install
         ])
         .run(tauri::generate_context!())
         .expect("error while running Nookstacks");

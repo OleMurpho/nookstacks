@@ -579,3 +579,14 @@ body.rail-open #railScrim{opacity:1}
 /* nothing is drawn until the board is known: no flash of the wrong board */
 body.booting #world { visibility: hidden; }
 body.booting #cylinder { visibility: hidden; }
+
+/* updates block in Settings */
+.updmsg{margin:8px 0 0; font-size:11.5px; line-height:1.45; color:var(--dim2); min-height:0}
+.updmsg[data-kind="ok"]{color:var(--mint, #6fd9a0)}
+.updmsg[data-kind="bad"]{color:var(--rose, #f08fa6)}
+.updmsg[data-kind="new"]{color:var(--ui-text)}
+.updnote{color:var(--dim3); font-size:11px}
+.updbar{margin-top:8px; height:4px; border-radius:2px; background:rgba(var(--white-rgb),.1); overflow:hidden}
+.updbar i{display:block; height:100%; width:0; background:var(--accent-bright); transition:width .18s linear}
+.updgo{margin-top:8px}
+.updgo[hidden]{display:none}
