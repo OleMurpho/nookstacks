@@ -77,7 +77,7 @@ Each region carries its own colour. Right-click → **Colour** opens eight swatc
 
 ### Selecting
 
-One click selects a card. `Ctrl`-click (or `⌘`-click) adds or removes one card, `Shift`-click adds without toggling, and dragging a box on empty board selects everything the box touches — the way the desktop picks up icons. Dragging any card in a selection moves the whole set, and Delete, Cut, Copy, Duplicate, Bring to front, Send to back and Centre all work on the selection rather than on one card.
+One click selects a card. `Ctrl`-click (or `⌘`-click) adds or removes one card, `Shift`-click adds without toggling, and dragging a box on empty board selects everything the box touches — the way the desktop picks up icons. Dragging any card in a selection moves the whole set — including any selected regions, so a card and its frame stay together — and Delete, Cut, Copy, Duplicate, Bring to front, Send to back and Centre all work on the selection rather than on one card.
 
 The board itself moves with **right-drag on empty canvas** only, so the left button is free for selecting and moving cards.
 

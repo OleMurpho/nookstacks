@@ -1002,14 +1002,20 @@ function wireHead(el, doc){
     note('carddown');
     const z = cam.z * fitZoom();
     const sx = e.clientX, sy = e.clientY, ox = doc.x, oy = doc.y;
-    // every other selected card travels with this one
+    // every other selected card travels with this one -- and every selected
+    // region does too, so a card and its frame never drift apart
     const mates = selDocs().filter(d => d.id !== doc.id).map(d => ({ d, x: d.x, y: d.y }));
+    const frames = curShelf().groups.filter(g => gsel.has(g.id)).map(g => ({ g, x: g.x, y: g.y }));
     const move = ev => {
       note('cardmove');
       const ddx = (ev.clientX - sx) / z, ddy = (ev.clientY - sy) / z;
       mates.forEach(m => { m.d.x = m.x + ddx; m.d.y = m.y + ddy;
         const me = document.querySelector(`.obj[data-id="${m.d.id}"]`);
         if (me){ me.style.left = m.d.x + 'px'; me.style.top = m.d.y + 'px'; }
+      });
+      frames.forEach(f => { f.g.x = f.x + ddx; f.g.y = f.y + ddy;
+        const fe = document.querySelector(`.group[data-gid="${f.g.id}"]`);
+        if (fe){ fe.style.left = f.g.x + 'px'; fe.style.top = f.g.y + 'px'; }
       });
       doc.x = ox + (ev.clientX - sx) / z;
       doc.y = oy + (ev.clientY - sy) / z;
