@@ -21,6 +21,7 @@ kind of card, and whatever you do there is kept in your own browser, never uploa
 - **Select in bulk** — click, `Ctrl`-click, `Shift`-click, or drag a box over the board. Whatever is selected moves together, cards and regions alike.
 - **Menus built per thing** — a note edits and copies its text, a model frames and wireframes, media plays and loops, a region recolours, the empty board makes new things.
 - **A file, not a service** — one folder of JSON and blobs, autosaved, 40 rolling backups, 80 steps of undo. No account, no sync, no network.
+- **Boards travel** — *File → Export* writes a `.nks` bundle: the board, its regions and every file on it, in one zip. *Open board* reads it back. The desktop app asks where to save; the browser downloads it.
 
 ## Regions
 

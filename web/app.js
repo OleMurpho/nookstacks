@@ -48,6 +48,99 @@ const idb = {
 
 /* No server and no desktop shell (a static host, a file:// copy): the browser's
    own IndexedDB becomes the vault. Same interface, so nothing above it changes. */
+/* ------------------------------------------------------- a tiny zip, no deps
+   .nks is a zip of nookstacks.json + state.json + blobs/<id>. Media is already
+   compressed, so writing stored entries loses nothing and keeps this small. */
+const CRC32 = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++){ let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[i] = c >>> 0; }
+  return t;
+})();
+function crc32(u8){ let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC32[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+const utf8 = s => new TextEncoder().encode(s);
+function dosStamp(d = new Date()){
+  const time = ((d.getHours() & 31) << 11) | ((d.getMinutes() & 63) << 5) | ((d.getSeconds() / 2) & 31);
+  const date = (((d.getFullYear() - 1980) & 127) << 9) | (((d.getMonth() + 1) & 15) << 5) | (d.getDate() & 31);
+  return { time, date };
+}
+function zipStore(entries){
+  const { time, date } = dosStamp();
+  const chunks = [], central = [];
+  let offset = 0;
+  for (const e of entries){
+    const name = utf8(e.name), data = e.data, crc = crc32(data), n = data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0, true);
+    lh.setUint16(8, 0, true); lh.setUint16(10, time, true); lh.setUint16(12, date, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, n, true); lh.setUint32(22, n, true);
+    lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    chunks.push(new Uint8Array(lh.buffer), name, data);
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);
+    cd.setUint16(8, 0, true); cd.setUint16(10, 0, true); cd.setUint16(12, time, true);
+    cd.setUint16(14, date, true); cd.setUint32(16, crc, true); cd.setUint32(20, n, true);
+    cd.setUint32(24, n, true); cd.setUint16(28, name.length, true);
+    cd.setUint16(30, 0, true); cd.setUint16(32, 0, true); cd.setUint16(34, 0, true);
+    cd.setUint16(36, 0, true); cd.setUint32(38, 0, true); cd.setUint32(42, offset, true);
+    central.push(new Uint8Array(cd.buffer), name);
+    offset += 30 + name.length + n;
+  }
+  let cdSize = 0;
+  for (const c of central) cdSize += c.length;
+  const eocd = new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0, 0x06054b50, true); eocd.setUint16(4, 0, true); eocd.setUint16(6, 0, true);
+  eocd.setUint16(8, entries.length, true); eocd.setUint16(10, entries.length, true);
+  eocd.setUint32(12, cdSize, true); eocd.setUint32(16, offset, true); eocd.setUint16(20, 0, true);
+  const all = [...chunks, ...central, new Uint8Array(eocd.buffer)];
+  let total = 0;
+  for (const a of all) total += a.length;
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const a of all){ out.set(a, at); at += a.length; }
+  return out;
+}
+async function unzip(bytes){
+  const u8 = new Uint8Array(bytes), dv = new DataView(u8.buffer);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 66000); i--){
+    if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('not a zip');
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const out = {};
+  for (let i = 0; i < count; i++){
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('bad zip directory');
+    const method = dv.getUint16(p + 10, true);
+    const csize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const local = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
+    const dataStart = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+    const raw = u8.subarray(dataStart, dataStart + csize);
+    if (method === 0){ out[name] = raw; }
+    else if (method === 8 && typeof DecompressionStream === 'function'){
+      const d = new DecompressionStream('deflate-raw');
+      const w = d.writable.getWriter(); w.write(raw); w.close();
+      out[name] = new Uint8Array(await new Response(d.readable).arrayBuffer());
+    } else { throw new Error('unsupported compression in bundle'); }
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+const saveAs = (blob, filename) => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 20000);
+};
+const nksFile = name => (String(name || 'board').replace(/[^\w \-]+/g, '-').trim() || 'board') + '.nks';
+
 const localVault = {
   kind: 'local', ok: true, path: '',
   async ping(){ return true; },
@@ -68,15 +161,83 @@ const localVault = {
   async delBlob(){},
   async pick(){ return null; },
   async importPaths(){ return []; },
-  async exportBundle(){ return { error: 'export needs the desktop app or the dev server' }; },
-  async importBundle(){ return { error: 'import needs the desktop app or the dev server' }; }
+  /* the same .nks container, built here instead of in Rust */
+  async exportBundle(state, scope, name){
+    const copy = JSON.parse(JSON.stringify(state));
+    const ids = [];
+    const seen = new Set();
+    const docs = [];
+    const walk = v => {
+      if (Array.isArray(v)) return v.forEach(walk);
+      if (v && typeof v === 'object'){
+        if (v.kind && v.id && v.w !== undefined) docs.push(v);
+        Object.values(v).forEach(walk);
+      }
+    };
+    walk(copy);
+    const entries = [];
+    for (const doc of docs){
+      let blob = null, id = doc.blobId;
+      if (id) blob = await this.getBlob(id);
+      // demo cards keep their file beside the app: pull it in so the bundle travels whole
+      if (!blob && doc.src){
+        try { const r = await fetch(doc.src); if (r.ok) blob = await r.blob(); } catch {}
+        if (blob){ id = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); doc.blobId = id; delete doc.src; }
+      }
+      if (!blob || !id) { if (doc.src) delete doc.src; continue; }
+      if (seen.has(id)) continue;
+      seen.add(id); ids.push(id);
+      entries.push({ name: 'blobs/' + id, data: new Uint8Array(await blob.arrayBuffer()) });
+    }
+    const manifest = { format: 'nookstacks.bundle', version: 1, app: '0.1.0', scope, name,
+                       exported_ms: Date.now(), blobs: ids };
+    const zip = zipStore([
+      { name: 'nookstacks.json', data: utf8(JSON.stringify(manifest, null, 2)) },
+      { name: 'state.json', data: utf8(JSON.stringify(copy)) },
+      ...entries
+    ]);
+    const blob = new Blob([zip], { type: 'application/zip' });
+    const file = nksFile(name);
+    saveAs(blob, file);
+    return { bytes: blob.size, path: file, blobs: ids.length, scope, name };
+  },
+
+  async importBundle(){
+    const picked = await new Promise(resolve => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = '.nks,application/zip';
+      inp.onchange = () => resolve(inp.files[0] || null);
+      inp.click();
+    });
+    if (!picked) return null;
+    return this.importNksBytes(await picked.arrayBuffer());
+  },
+
+  async importNksBytes(buffer){
+    const files = await unzip(buffer);
+    if (!files['state.json']) throw new Error('no state.json in bundle');
+    if (!files['nookstacks.json']) throw new Error('no nookstacks.json in bundle');
+    const manifest = JSON.parse(new TextDecoder().decode(files['nookstacks.json']));
+    if (manifest.format && manifest.format !== 'nookstacks.bundle') throw new Error('not a nookstacks bundle');
+    const state = JSON.parse(new TextDecoder().decode(files['state.json']));
+    let added = 0;
+    for (const [path, bytes] of Object.entries(files)){
+      const id = path.startsWith('blobs/') ? path.slice(6) : '';
+      if (!id || id.includes('/') || id.includes('..')) continue;
+      const have = await this.getBlob(id).catch(() => null);
+      if (have) continue;
+      await idb.put(id, { blob: new Blob([bytes]), name: id, type: '' });
+      added++;
+    }
+    return { manifest, state, blobs_added: added };
+  }
 };
 
 /* ---------------------------------------------------------------- seed */
 function seed(){
   const mk = (kind, title, x, y, w, h, extra = {}) => ({ id: 'o' + Math.random().toString(36).slice(2, 9), kind, title, x, y, w, h, ...extra });
   const demo = (kind, title, file, ext, x, y, w, h, extra = {}) =>
-    mk(kind, title, x, y, w, h, { src: 'demo/' + file, ext, size: 0, ...extra });
+    mk(kind, title, x, y, w, h, { ...(file ? { src: 'demo/' + file } : {}), ext, size: 0, ...extra });
 
   return { demo: true, demoVersion: DEMO_VERSION, levels: [
     { id:'ex1', name:'Example Category 1', shelves:[
@@ -1764,7 +1925,7 @@ try { render(); } catch (e) {
   window.__err = e.message + '\n' + (e.stack || '');
   console.error(e);
 }
-window.__nookstacks = { get db(){ return db; }, addFiles, place, removeDoc, DBG,
+window.__nookstacks = { get db(){ return db; }, vault, importNks, exportNks, addFiles, place, removeDoc, DBG,
   get cam(){ return { ...cam }; },
   get state(){ return { level, shelf, selected, selection: [...sel], docs: curShelf().docs.length }; },
   selectMany, toggleSel, clearSel,
@@ -2380,7 +2541,10 @@ async function exportNks(scope){
     }
     const res = await vault.exportBundle(payload, scope, name);
     if (res && res.cancelled) { setSaveState('export cancelled', 'bad'); return; }
-    setSaveState('exported ' + (res.bytes ? Math.round(res.bytes / 1024) + ' KB' : ''), 'ok');
+    // never report a save that did not happen
+    if (!res || res.error) throw new Error((res && res.error) || 'nothing was written');
+    if (!res.bytes) throw new Error('the bundle came back empty');
+    setSaveState('exported ' + Math.round(res.bytes / 1024) + ' KB', 'ok');
     if (res.path) $('#saveState').title = res.path;
   } catch (e){
     note('errors', e);
@@ -2389,10 +2553,11 @@ async function exportNks(scope){
 }
 
 /* Import a bundle as a new project (board) or replace the tower (vault). */
-async function importNks(){
+async function importNks(provided){
   try {
-    const res = await vault.importBundle();
+    const res = provided || await vault.importBundle();
     if (!res) { setSaveState('import cancelled', 'bad'); return; }
+    if (res.error) throw new Error(res.error);
     const m = res.manifest || {};
     if (m.scope === 'vault'){
       if (!confirm('This bundle contains every project (' + (res.state.levels || []).length + ' categories).\n\nImporting replaces the tower you have open now. Your current board is kept in the vault history.\n\nContinue?')) return;
