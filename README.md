@@ -55,7 +55,7 @@ Sixteen palettes — Obsidian, Manuscript, Graphite, Daylight, **Electro**, **La
 
 **Linux** — take the `.deb` or `.AppImage` from the same [release](../../releases/latest); the `.deb` pulls in `libwebkit2gtk-4.1`.
 
-**Browser** — nothing to install: **[olemurpho.github.io/nookstacks](https://olemurpho.github.io/nookstacks/)**.
+**Browser** — nothing to install: **[nookstacks.io](https://nookstacks.io)**.
 The board is kept in that browser's own storage. No account, no server.
 
 To run it locally against a vault folder instead:
