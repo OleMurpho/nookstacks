@@ -9,7 +9,13 @@ import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { parseBlend, createObjects } from './vendor/blend/index.js';
 
 /* ---------------------------------------------------------------- consts */
-const SW = 1240, SH = 780, RAILW = 232;
+const SW = 1240, SH = 780, RAIL_FULL = 232, RAIL_BAR = 46;
+/* the board sits beside the rail when it is a column, and under it when it is a drawer */
+const isPhone = () => innerWidth <= 760;
+const railW = () => isPhone() ? 0
+  : document.body.classList.contains('rail-bar') ? RAIL_BAR
+  : (innerWidth <= 1024 ? 198 : RAIL_FULL);
+const RAILW = RAIL_FULL;   // legacy constant: full width of the column
 const LKEY = 'nookstacks.v3';
 const TEXT_EXT = /\.(txt|md|markdown|csv|json|ya?ml|toml|ini|cfg|conf|log|xml|html?|css|js|mjs|ts|tsx|jsx|py|rb|go|rs|c|h|cpp|hpp|cs|java|kt|lua|sh|bash|zsh|sql|glsl|hlsl|vsh|fsh|vue|svelte)$/i;
 const MODEL_EXT = /\.(glb|gltf|obj|stl|fbx|ply|dae|blend)$/i;
@@ -249,8 +255,8 @@ function seed(){
         docs:[
           /* --- the tutorial, as ordinary notes on the board --- */
           mk('note','1 · This is a demo', 80, 90, 340, 200, { text:'<p>Everything here is an example. Rename it, drag it, delete it — nothing on this board is precious.</p>' }),
-          mk('note','2 · Drag a card by its tab', 440, 90, 360, 200, { text:'<p>Grab the strip at the top of a card. The body stays put so you can click and edit inside it.</p>' }),
-          mk('note','3 · Regions group things', 80, 330, 340, 300, { text:'<p>A region is a coloured frame around part of a board — like these four. Drag its tab to move it; the contents do not follow unless you select them too.</p><p>Right-click a region tab for its colour, or to fit the board to it.</p>' }),
+          mk('note','2 · Drag a card by its tab', 440, 90, 360, 200, { text:'<p>Grab the strip at the top of a card. The body stays put so you can click and edit inside it.</p><p>On a phone: one finger moves the board, two pinch to zoom.</p>' }),
+          mk('note','3 · Regions group things', 80, 330, 340, 300, { text:'<p>A region is a coloured frame around part of a board — like these four. Drag its tab to move it; the contents do not follow unless you select them too.</p><p>Right-click a region tab — long-press on a touch screen — for its colour, or to fit the board to it.</p>' }),
           mk('note','4 · Your board is a file', 440, 330, 360, 300, { text:'<p>Notes, documents and every attached file live in one vault folder. Nothing leaves the machine.</p><p>Press <b>S</b> for settings and themes, <b>?</b> for every shortcut.</p>' }),
 
           /* --- one of everything --- */
@@ -409,7 +415,7 @@ const vault = {
   }
 };
 
-const DEMO_VERSION = 2;
+const DEMO_VERSION = 3;
 let db = seed();
 
 /* ---------------------------------------------------------------- settings */
@@ -676,7 +682,11 @@ async function boot(){
   // a fresh vault should record its defaults, not just imply them
   if (!db.settings){ db.settings = { ...DEFAULT_SETTINGS }; dirtyAfterBoot = true; }
   applySettings();
+  bootRail();
+  wireRailToggle();
   render();
+  // a phone starts legible instead of showing the whole board at 23%
+  if (isPhone() && !cam.x && !cam.y) fitView();
   document.body.classList.remove('booting');
   if (dirtyAfterBoot){ dirtyAfterBoot = false; save(); }
 }
@@ -688,7 +698,7 @@ function applyCam(animate = true){
   const z = cam.z * fitZoom();
   if (!isFinite(cam.x) || !isFinite(cam.y) || !isFinite(cam.z) || cam.z <= 0){ cam = { x:0, y:0, z:1 }; }
   const cx = SW / 2 + cam.x, cy = SH / 2 + cam.y;
-  const midX = (innerWidth + RAILW) / 2;
+  const midX = (innerWidth + railW()) / 2;
   w.style.transform = `translate(${midX - cx*z}px, ${innerHeight/2 - cy*z}px) scale(${z})`;
   // the transition is switched by the gesture handlers, never per frame:
   // toggling it here made every mousemove start a .5s animation the next one cut short.
@@ -1108,6 +1118,19 @@ function renderRail(){
    already on never opened the rename box: the first click rebuilt the row, so
    the browser delivered the dblclick to the list instead of the label. */
 let railWired = false;
+function wireRailToggle(){
+  const tgl = document.getElementById('railToggle');
+  const bar = document.getElementById('railBar');
+  const scrim = document.getElementById('railScrim');
+  if (tgl) tgl.addEventListener('click', e => { e.stopPropagation(); toggleRail(); });
+  if (bar) bar.addEventListener('click', () => setRail('open'));
+  if (scrim) scrim.addEventListener('click', () => setRail('closed'));
+  const x = document.getElementById('railClose');
+  if (x) x.addEventListener('click', () => setRail('closed'));
+  document.querySelectorAll('#catList, #projList').forEach(list =>
+    list.addEventListener('click', () => { if (isPhone()) setRail('closed'); }, true));
+}
+
 function wireRail(){
   if (railWired) return;
   railWired = true;
@@ -1565,15 +1588,64 @@ function contentBounds(){
   return Number.isFinite(x0) ? { x0, y0, x1, y1 } : null;
 }
 
+/* ---------------------------------------------------------------- rail */
+function setRail(mode, persist = true){
+  const before = railW();
+  const bar = mode === 'bar' && !isPhone();
+  const drawer = mode === 'open' && isPhone();
+  document.body.classList.toggle('rail-bar', bar);
+  document.body.classList.toggle('rail-open', drawer);
+  document.documentElement.style.setProperty('--railw', railW() + 'px');
+  const barEl = document.getElementById('railBar');
+  if (barEl) barEl.hidden = !bar;
+  const scrim = document.getElementById('railScrim');
+  if (scrim) scrim.hidden = !drawer;
+  const tgl = document.getElementById('railToggle');
+  if (tgl) tgl.setAttribute('aria-expanded', String(!bar && (drawer || !isPhone())));
+  const delta = railW() - before;
+  if (delta){
+    // the board keeps its place on screen while the column gives way
+    const zAbs = cam.z * fitZoom();
+    if (zAbs > 0) cam.x += delta / (2 * zAbs);
+  }
+  if (persist && db && db.settings){ db.settings.rail = (isPhone() ? 'drawer' : mode); save(); }
+  applyCam(false);
+}
+function railMode(){
+  if (isPhone()) return document.body.classList.contains('rail-open') ? 'open' : 'closed';
+  return document.body.classList.contains('rail-bar') ? 'bar' : 'open';
+}
+function toggleRail(){
+  const m = railMode();
+  if (isPhone()) setRail(m === 'open' ? 'closed' : 'open');
+  else setRail(m === 'bar' ? 'open' : 'bar');
+}
+function bootRail(){
+  const saved = (db.settings && db.settings.rail) === 'bar';
+  setRail(isPhone() ? 'closed' : (saved ? 'bar' : 'open'), false);
+}
+
 /* Fit means: every element on screen, whatever its distance from the centre. */
 function fitView(pad = 88){
   const b = contentBounds();
   if (!b){ cam = { x:0, y:0, z:1 }; stash(); applyCam(); return; }
-  const availW = Math.max(240, innerWidth - RAILW - pad * 2);
-  const availH = Math.max(180, innerHeight - 34 - pad * 2);
+  const chromeBottom = (document.getElementById('topbar')?.getBoundingClientRect().bottom || 40) + 6;
+  const availW = Math.max(200, innerWidth - railW() - pad * 2);
+  const availH = Math.max(180, innerHeight - chromeBottom - pad * 2);
   const w = Math.max(1, b.x1 - b.x0), h = Math.max(1, b.y1 - b.y0);
   // never magnify past 1.5x world scale — a single card should not fill the screen
-  const zAbs = Math.min(availW / w, availH / h, 1.5);
+  let zAbs = Math.min(availW / w, availH / h, 1.5);
+  if (isPhone()){
+    // a phone cannot show a whole board and still let you read it, so Fit frames
+    // the top-left of the work at roughly one card's width instead of shrinking
+    zAbs = Math.max(0.85, Math.min(1.15, innerWidth / 400));
+    const z = zAbs / fitZoom(), midX = (innerWidth + railW()) / 2;
+    const sx = railW() + 14, sy = chromeBottom + 12;
+    cam = { z, x: b.x0 - SW / 2 - (sx - midX) / zAbs, y: b.y0 - SH / 2 - (sy - innerHeight / 2) / zAbs };
+    stash(); applyCam(); return;
+  }
+  // tablets get a legible floor too: fitting six regions whole is not useful
+  if (innerWidth <= 1024) zAbs = Math.max(0.42, zAbs);
   const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
   // screen = midX + z * (world - SW/2 - cam.x), so the bbox centre lands at midX
   cam = { z: zAbs / fitZoom(), x: cx - SW / 2, y: cy - SH / 2 };
@@ -1606,6 +1678,7 @@ addEventListener('keydown', e => {
     if (k === 'x' && sel.size){ e.preventDefault(); cutSelection(); return; }
     if (k === 'v' && CLIP){ e.preventDefault(); pasteClipboard(); return; }
     if (k === 'a'){ e.preventDefault(); selectMany(curShelf().docs.map(d => d.id)); return; }
+    if (k === 'b'){ e.preventDefault(); toggleRail(); return; }
   }
   switch (e.key){
     case 'ArrowUp': e.preventDefault(); goLevel(level-1); break;
@@ -1874,7 +1947,7 @@ const PAN = { moved: 0 };        // how far the last right-drag travelled: a pan
     note('zooms');
     // exact: the world point under the cursor must not move
     const z0 = cam.z * fitZoom();
-    const midX = (innerWidth + RAILW) / 2;
+    const midX = (innerWidth + railW()) / 2;
     const tx0 = midX - (SW/2 + cam.x) * z0;
     const ty0 = innerHeight/2 - (SH/2 + cam.y) * z0;
     const wx = (e.clientX - tx0) / z0, wy = (e.clientY - ty0) / z0;
@@ -1893,11 +1966,116 @@ const PAN = { moved: 0 };        // how far the last right-drag travelled: a pan
     world._zt = setTimeout(() => { world.classList.remove('dragging'); stash(); }, 220);
   }, { passive:false });
 
+
+  /* ------------------------------------------------------------- touch
+     A phone gets one finger to move the board, two to pinch, and a long press
+     for the menu the right button would have opened. Cards keep their own
+     gestures: the synthetic mouse press still reaches them. */
+  let tpan = null, pinch = null, lpTimer = null, dragProxy = null;
+  const clearLp = () => { clearTimeout(lpTimer); lpTimer = null; };
+
+  surface.addEventListener('touchstart', e => {
+    // a tap anywhere else puts a menu away, the way a click does on the desktop
+    if (!e.target.closest('#ctx') && document.getElementById('ctx')) closeCtx();
+    if (e.touches.length === 2){
+      clearLp(); tpan = null;
+      const [a1, b1] = e.touches;
+      const z0 = cam.z * fitZoom(), midX = (innerWidth + railW()) / 2;
+      const cx = (a1.clientX + b1.clientX) / 2, cy = (a1.clientY + b1.clientY) / 2;
+      pinch = {
+        d: Math.max(1, Math.hypot(a1.clientX - b1.clientX, a1.clientY - b1.clientY)),
+        cx, cy, z0,
+        wx: (cx - midX) / z0 + SW / 2 + cam.x,
+        wy: (cy - innerHeight / 2) / z0 + SH / 2 + cam.y
+      };
+      e.preventDefault();
+      return;
+    }
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    clearLp();
+    lpTimer = setTimeout(() => {
+      lpTimer = null;
+      if (tpan && tpan.moved > 9) return;
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      if (!el) return;
+      if (navigator.vibrate) navigator.vibrate(8);
+      el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true,
+        clientX: t.clientX, clientY: t.clientY, button: 2, buttons: 2 }));
+    }, 520);
+    // a card or region is moved by its tab, and a touch drag has to be fed to
+    // the same handler the mouse uses: the browser sends one mousedown and no move
+    if (t.target.closest('.obj .head, .grouphead') && !t.target.closest('button')){
+      dragProxy = { x: t.clientX, y: t.clientY, moved: 0 };
+      // Chrome only synthesises the mouse press on release, so press it now
+      t.target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true,
+        clientX: t.clientX, clientY: t.clientY, button: 0, buttons: 1 }));
+      return;
+    }
+    const mine = t.target.closest('.obj, .grouphead, .gdel, .gh, button, input, textarea, select,' +
+      ' a[href], iframe, video, audio, canvas.mesh, #topbar, #rail, #menubar, .mb-drop, #settings');
+    if (mine || drawMode) return;                       // the thing under the finger owns it
+    tpan = { x: t.clientX, y: t.clientY, cx: cam.x, cy: cam.y, moved: 0 };
+  }, { passive: false });
+
+  surface.addEventListener('touchmove', e => {
+    if (pinch && e.touches.length === 2){
+      e.preventDefault();
+      const [a1, b1] = e.touches;
+      const d = Math.max(1, Math.hypot(a1.clientX - b1.clientX, a1.clientY - b1.clientY));
+      const zNew = Math.min(150, Math.max(0.02, pinch.z0 * (d / pinch.d)));
+      const cx = (a1.clientX + b1.clientX) / 2, cy = (a1.clientY + b1.clientY) / 2;
+      const midX = (innerWidth + railW()) / 2;
+      cam.z = zNew / fitZoom();
+      cam.x = pinch.wx - SW / 2 - (cx - midX) / zNew;
+      cam.y = pinch.wy - SH / 2 - (cy - innerHeight / 2) / zNew;
+      world.classList.add('dragging');
+      applyCam(false);
+      return;
+    }
+    if (dragProxy && e.touches.length === 1){
+      const t = e.touches[0];
+      dragProxy.moved = Math.max(dragProxy.moved, Math.hypot(t.clientX - dragProxy.x, t.clientY - dragProxy.y));
+      if (dragProxy.moved > 4){
+        clearLp();
+        e.preventDefault();
+        window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true,
+          clientX: t.clientX, clientY: t.clientY, buttons: 1 }));
+      }
+      return;
+    }
+    if (!tpan || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - tpan.x, dy = t.clientY - tpan.y;
+    tpan.moved = Math.max(tpan.moved, Math.hypot(dx, dy));
+    if (tpan.moved > 5) clearLp();
+    if (tpan.moved < 5) return;
+    e.preventDefault();
+    const zAbs = cam.z * fitZoom();
+    cam.x = tpan.cx - dx / zAbs;
+    cam.y = tpan.cy - dy / zAbs;
+    world.classList.add('dragging');
+    applyCam(false);
+  }, { passive: false });
+
+  const endTouch = () => {
+    clearLp();
+    const wasMoving = !!pinch || (tpan && tpan.moved > 5) || (dragProxy && dragProxy.moved > 4);
+    if (dragProxy && dragProxy.moved > 4){
+      window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0 }));
+    }
+    pinch = null; tpan = null; dragProxy = null;
+    world.classList.remove('dragging');
+    if (wasMoving) stash();
+  };
+  surface.addEventListener('touchend', endTouch);
+  surface.addEventListener('touchcancel', endTouch);
+
   // double-click empty board zooms in a step, at the cursor
   surface.addEventListener('dblclick', e => {
     if (e.target.closest('.obj')) return;
     const z0 = cam.z * fitZoom();
-    const midX = (innerWidth + RAILW) / 2;
+    const midX = (innerWidth + railW()) / 2;
     const tx0 = midX - (SW/2 + cam.x) * z0;
     const ty0 = innerHeight/2 - (SH/2 + cam.y) * z0;
     const wx = (e.clientX - tx0) / z0, wy = (e.clientY - ty0) / z0;
@@ -1910,7 +2088,17 @@ const PAN = { moved: 0 };        // how far the last right-drag travelled: a pan
   });
 })();
 
-addEventListener('resize', () => applyCam(false));
+addEventListener('resize', () => {
+  const phone = isPhone();
+  if (phone !== wasPhone){
+    wasPhone = phone;
+    // crossing the breakpoint re-decides what the rail is
+    setRail(phone ? 'closed' : ((db.settings && db.settings.rail) === 'bar' ? 'bar' : 'open'), false);
+    if (phone) fitView();
+  }
+  applyCam(false);
+});
+let wasPhone = isPhone();
 addEventListener('blur', () => document.getElementById('world').classList.remove('dragging'));
 document.addEventListener('dragstart', e => { if (e.target.closest && e.target.closest('.obj')) e.preventDefault(); });
 document.addEventListener('selectstart', e => { if (e.target.closest && e.target.closest('.obj .body')) return; e.preventDefault(); });
@@ -1925,7 +2113,7 @@ try { render(); } catch (e) {
   window.__err = e.message + '\n' + (e.stack || '');
   console.error(e);
 }
-window.__nookstacks = { get db(){ return db; }, vault, importNks, exportNks, addFiles, place, removeDoc, DBG,
+window.__nookstacks = { get db(){ return db; }, vault, importNks, exportNks, setRail, toggleRail, railMode, fitView, wireRailToggle, addFiles, place, removeDoc, DBG,
   get cam(){ return { ...cam }; },
   get state(){ return { level, shelf, selected, selection: [...sel], docs: curShelf().docs.length }; },
   selectMany, toggleSel, clearSel,

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>Nookstacks</title>
 <meta name="description" content="An infinite board for every project you're building. Notes, documents, images, PDFs, video, audio and 3D models on one canvas — local-first, on Windows, Linux and in the browser.">
 <meta name="theme-color" content="#0b0e14">
@@ -28,8 +28,8 @@
 <meta name="twitter:description" content="Notes, documents, images, PDFs, video, audio and 3D models on one canvas. Local-first.">
 <meta name="twitter:image" content="https://nookstacks.io/og.png">
 
-<link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="themes.css?v=1">
+<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="themes.css?v=2">
 <script type="importmap">
 { "imports": {
     "three": "./vendor/three/three.module.js",
@@ -49,23 +49,30 @@
   </div>
 
   <header id="topbar">
-    <div id="crumb"><span id="levelName">—</span><span class="sep">/</span><span id="projectName">—</span></div>
+    <div class="tb-left">
+      <button id="railToggle" class="railbtn" aria-label="Categories" title="Hide or show the rail (Ctrl+B)">☰</button>
+      <div id="crumb"><span id="levelName">—</span><span class="sep">/</span><span id="projectName">—</span></div>
+    </div>
     <div class="tb-tools">
-      <button data-tool="note" title="New note (N)"><i>▤</i>Note</button>
-      <button data-tool="text" title="New document (T)"><i>≡</i>Document</button>
-      <button data-tool="import" title="Place files from your computer"><i>⬆</i>Import</button>
-      <button data-tool="url" title="Place an image, model or link from the web"><i>⌘</i>From URL</button>
+      <button data-tool="note" title="New note (N)"><i>▤</i><span class="lbl">Note</span></button>
+      <button data-tool="text" title="New document (T)"><i>≡</i><span class="lbl">Document</span></button>
+      <button data-tool="import" title="Place files from your computer"><i>⬆</i><span class="lbl">Import</span></button>
+      <button data-tool="url" title="Place an image, model or link from the web"><i>⌘</i><span class="lbl">From URL</span></button>
       <span class="tb-div"></span>
-      <button data-tool="region" title="Draw a region around things (G)"><i>▢</i>Region</button>
-      <button data-tool="fit" title="Fit this project (F)"><i>⤢</i>Fit</button>
-      <button data-tool="delete" id="btnDelete" disabled title="Delete selection (Del)"><i>✕</i>Delete</button>
+      <button data-tool="region" title="Draw a region around things (G)"><i>▢</i><span class="lbl">Region</span></button>
+      <button data-tool="fit" title="Fit this project (F)"><i>⤢</i><span class="lbl">Fit</span></button>
+      <button data-tool="delete" id="btnDelete" disabled title="Delete selection (Del)"><i>✕</i><span class="lbl">Delete</span></button>
     </div>
     <div id="saveState" class="savestate" title="where this board is stored">connecting…</div>
     <div id="counts"></div>
   </header>
 
+  <button id="railBar" hidden title="Show categories and projects">
+    <span class="baric">☰</span><span class="barlabel">Categories · Projects</span><span class="barchev">›</span>
+  </button>
+  <div id="railScrim" hidden></div>
   <aside id="rail">
-    <div class="railhead">Categories</div>
+    <div class="railhead"><span>Categories</span><button id="railClose" aria-label="Close" title="Close">✕</button></div>
     <div id="catList"></div>
     <button id="addCat" class="railadd" title="Add category">+</button>
     <div class="railhead second">Projects</div>
@@ -129,6 +136,6 @@
 
   <input id="fileinput" type="file" multiple hidden>
 </div>
-<script type="module" src="app.js?v=3"></script>
+<script type="module" src="app.js?v=5"></script>
 </body>
 </html>
