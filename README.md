@@ -51,9 +51,9 @@ Sixteen palettes — Obsidian, Manuscript, Graphite, Daylight, **Electro**, **La
 
 ## Install
 
-**Windows** — run `Nookstacks_0.1.0_x64-setup.exe`; it installs per-user, no admin needed.
+**Windows** — [download `Nookstacks_0.1.0_x64-setup.exe`](../../releases/latest); it installs per-user, no admin rights needed.
 
-**Linux** — install the `.deb` (it pulls in `libwebkit2gtk-4.1`).
+**Linux** — take the `.deb` or `.AppImage` from the same [release](../../releases/latest); the `.deb` pulls in `libwebkit2gtk-4.1`.
 
 **Browser** — the interface is plain HTML/CSS/JS over a small Python server:
 
