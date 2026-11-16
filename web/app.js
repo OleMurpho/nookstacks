@@ -1522,7 +1522,9 @@ const PAN = { moved: 0 };        // how far the last right-drag travelled: a pan
     // right button moves the board, and only over bare canvas: an element keeps
     // the right button for its own context menu
     if (e.button === 2){
-      if (overElement) return;
+      // a card owns the right button (its own menu); a region does not — the board
+      // still pans when the drag starts on a region's surface
+      if (e.target.closest('.obj')) return;
       note('down');
       down = true; sx = e.clientX; sy = e.clientY; ox = cam.x; oy = cam.y; PAN.moved = 0;
       world.classList.add('dragging');
@@ -1597,6 +1599,9 @@ const PAN = { moved: 0 };        // how far the last right-drag travelled: a pan
     // self-heal a missed mouseup: no buttons held means the gesture is over
     if (e.buttons === 0){ end(); return; }
     PAN.moved = Math.max(PAN.moved, Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy));
+    // Windows fires contextmenu on the right press, before any movement: a drag
+    // that has actually travelled dismisses the menu it opened
+    if (PAN.moved > 4 && ctxEl) closeCtx();
     pending = e;
     if (frame) return;
     frame = requestAnimationFrame(() => {
