@@ -56,6 +56,8 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 | `Esc` | close the settings panel, cancel a region, deselect |
 | double-click a note | edit it, click away to save |
 | click + drag on empty board | draw a selection box; everything it touches is selected |
+| `Alt` + drag inside a region | draw a selection box instead of grabbing the region |
+| click + drag inside a region | grab and move that region (selection included) |
 | `Ctrl`/`⌘` + click a card | add it to the selection, click again to drop it |
 | `Shift` + click a card | add it to the selection without toggling |
 | `Ctrl+A` | select every card on the board |
@@ -63,7 +65,13 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 | wheel | zoom; over a scrollable document or a model, it scrolls or zooms that instead |
 | double-click a model | nothing — drag to orbit, wheel to zoom |
 
-Regions get moved by their label, resized by their corner handles, renamed by double-clicking the label, and deleted with the ✕ inside it.
+### Regions
+
+A region is an object, not a backdrop: click anywhere inside one and it is selected, drag anywhere inside it and the whole region moves — together with every other region and card that is selected. Grab it by the label too, resize it from the corner handles, rename it by double-clicking the label (or from its right-click menu), and delete it with the ✕ or `Delete`, which removes the region and leaves the cards inside it alone.
+
+Each region carries its own colour. Right-click → **Colour** opens eight swatches — amber, sky, mint, rose, violet, lime, orange, slate — and applies the choice to every selected region at once. The colour is stored with the region, so it survives a restart and travels inside an exported `.nks` board.
+
+![A region's Colour menu](docs/region-colour.png)
 
 ### Selecting
 
@@ -89,6 +97,14 @@ Right-clicking a card, a region or empty board opens a menu built for that thing
 Every card menu also carries the clipboard and arrangement commands with their shortcuts shown on the right.
 
 ![The menu for a 3D model](docs/context-menu.png)
+
+## Themes
+
+Sixteen palettes ship with it, and each is only a set of colour tokens, so nothing in the interface needs to know a theme exists: **Obsidian** (near-black and amber), **Manuscript** (warm parchment), **Graphite** (steel blue), **Daylight** (light chrome, warm paper), **Electro** (electric cyan), **Lava** (molten orange), **Meadow** (grassy green), **Ocean** (deep teal), **Sakura** (plum and blossom pink), **Terminal** (phosphor green on black), **Ember** (dark wood and copper), **Neon** (synthwave magenta), **Iris** (violet dusk), **Mono** (high-contrast black and white), **Frost** (icy light blue) and **Sand** (desert light).
+
+**Custom** builds a theme from five colours you pick — background, surfaces, paper, text and accent. The rest of the tokens are derived from them (borders, muted greys, paper ink, hover states), so the result stays coherent. *Copy from* seeds those five from any built-in theme as a starting point.
+
+![Six of the themes](docs/themes.png)
 
 ## The menu bar
 
