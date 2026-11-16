@@ -205,6 +205,14 @@ html,body{height:100%; margin:0; overflow:hidden; background:var(--bg); color:va
   border-left:2px solid transparent; transition:background .12s, color .12s}
 .ritem:hover{background:rgba(var(--white-rgb),.045); color:var(--text)}
 .ritem.on{color:var(--rail-on); border-left-color:var(--amber); background:rgba(var(--amber-rgb),.07)}
+/* a category or project given a colour: a faint wash and a hairline, not a swatch */
+.ritem.tinted{background:var(--tint-soft); border-left-color:var(--tint-edge)}
+.ritem.tinted:hover{background:var(--tint-hover)}
+.ritem.tinted.on{background:var(--tint-on); border-left-color:var(--tint); box-shadow:inset 0 0 0 1px var(--tint-edge)}
+.ritem.on .nm{font-weight:500; color:var(--text)}
+.ritem.tinted .nm{color:var(--text)}
+.ctx-tick{display:inline-block; width:12px; font-size:10px; color:var(--accent-bright); opacity:0}
+.ctx-tick.on{opacity:1}
 .ritem .nm{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .ritem .ct{font-family:JB,monospace; font-size:9.5px; color:var(--rail-count)}
 .ritem .mv{display:none; gap:2px}

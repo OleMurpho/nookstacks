@@ -1374,14 +1374,26 @@ function wireGroups(panelEl, shelf){
   });
 }
 
+/* A colour on a category or a project is a faint wash plus a hairline on the
+   left of its row: enough to tell two of them apart at a glance, not so much
+   that the rail turns into a paint chart. */
+const tintOf = item => {
+  if (!item || !item.color) return '';
+  const hex = (REGION_COLORS.find(c => c.key === item.color) || {}).hex;
+  if (!hex) return '';
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return `--tint:${hex};--tint-soft:rgba(${r},${g},${b},.12);--tint-hover:rgba(${r},${g},${b},.2);`
+       + `--tint-on:rgba(${r},${g},${b},.26);--tint-edge:rgba(${r},${g},${b},.7);`;
+};
+
 function renderRail(){
   const list = curLevel().shelves;
   $('#catList').innerHTML = db.levels.map((l,i) =>
-    `<div class="ritem ${i===level?'on':''}" data-kind="cat" data-i="${i}">
+    `<div class="ritem ${i===level?'on':''} ${l.color?'tinted':''}" data-kind="cat" data-i="${i}" style="${tintOf(l)}">
        <span class="nm">${esc(l.name)}</span>
        <span class="mv"><button data-mv="up">↑</button><button data-mv="down">↓</button></span></div>`).join('');
   $('#projList').innerHTML = list.map((s,i) =>
-    `<div class="ritem ${i===shelf?'on':''}" data-kind="proj" data-i="${i}">
+    `<div class="ritem ${i===shelf?'on':''} ${s.color?'tinted':''}" data-kind="proj" data-i="${i}" style="${tintOf(s)}">
        <span class="nm">${esc(s.name)}</span>
        <span class="mv"><button data-mv="up">↑</button><button data-mv="down">↓</button></span></div>`).join('');
   wireRail();
@@ -1441,6 +1453,13 @@ function wireRail(){
       if (kind === 'cat') goLevel(i); else goShelf(i);
     });
 
+    box.addEventListener('contextmenu', e => {
+      const row = e.target.closest('.ritem');
+      if (!row) return;
+      e.preventDefault(); e.stopPropagation();
+      railMenu(row.dataset.kind, +row.dataset.i, e.clientX, e.clientY);
+    });
+
     // native dblclick still works where the browser delivers it to the label
     box.addEventListener('dblclick', e => {
       if (e.target.tagName === 'INPUT') return;
@@ -1471,6 +1490,73 @@ function startRename(row, kind, i){
   });
   inp.addEventListener('blur', () => commit(true));
   inp.addEventListener('click', e => e.stopPropagation());
+}
+
+/* Right-click a category or a project. The same menu a card gets, for the two
+   things the rail holds: rename it, colour it, move it, add beside it, remove it. */
+function railMenu(kind, i, x, y){
+  const arr = kind === 'cat' ? db.levels : curLevel().shelves;
+  const item = arr[i];
+  if (!item) return;
+  const row = document.querySelector(`#${kind === 'cat' ? 'catList' : 'projList'} .ritem[data-i="${i}"]`);
+  const swatches = REGION_COLORS.map(c => ({
+    label: c.name, dot: c.hex, check: () => item.color === c.key,
+    run: () => setRailColor(kind, i, c.key)
+  }));
+  const items = [
+    { head: item.name },
+    { label: 'Rename', key: kind === 'cat' ? '' : 'F2',
+      run: () => { if (row) startRename(row, kind, i); } },
+    { label: 'Colour', items: [
+        ...swatches,
+        { sep: true },
+        { label: 'No colour', run: () => setRailColor(kind, i, null) }
+      ] },
+    { sep: true },
+    { label: kind === 'cat' ? 'New project here' : 'New project',
+      run: () => kind === 'cat' ? addProjectTo(i) : addProject() },
+    { label: 'Move up', need: () => i > 0, run: () => moveItem(kind, i, -1) },
+    { label: 'Move down', need: () => i < arr.length - 1, run: () => moveItem(kind, i, 1) },
+    { sep: true },
+    { label: kind === 'cat' ? 'Delete category…' : 'Delete project…', danger: true,
+      need: () => (kind === 'cat' ? db.levels.length > 1 : arr.length > 1),
+      run: () => removeRailItem(kind, i) }
+  ];
+  openCtx(x, y, items);
+}
+
+function setRailColor(kind, i, key){
+  const arr = kind === 'cat' ? db.levels : curLevel().shelves;
+  if (!arr[i]) return;
+  if (key) arr[i].color = key; else delete arr[i].color;
+  save(); render();
+}
+
+function addProjectTo(levelIndex){
+  const lvl = db.levels[levelIndex];
+  if (!lvl) return;
+  lvl.shelves.push({ id: 'p' + Math.random().toString(36).slice(2, 9), name: 'New project',
+    pan: { x: 0, y: 0, z: 1 }, groups: [], docs: [] });
+  level = levelIndex; shelf = lvl.shelves.length - 1;
+  cam = { x: 0, y: 0, z: 1 }; clearSel();
+  save(); render();
+}
+
+function removeRailItem(kind, i){
+  const arr = kind === 'cat' ? db.levels : curLevel().shelves;
+  const item = arr[i];
+  if (!item) return;
+  const what = kind === 'cat'
+    ? `Delete the category "${item.name}" and its ${item.shelves.length} project${item.shelves.length === 1 ? '' : 's'}? This cannot be undone.`
+    : `Delete the project "${item.name}" and everything on its board? This cannot be undone.`;
+  if (!window.confirm(what)) return;
+  arr.splice(i, 1);
+  if (kind === 'cat'){
+    if (level >= db.levels.length) level = db.levels.length - 1;
+    shelf = 0;
+  } else if (shelf >= curLevel().shelves.length) shelf = curLevel().shelves.length - 1;
+  clearSel();
+  save(); render();
 }
 
 function moveItem(kind, i, dir){
@@ -2615,7 +2701,9 @@ function openCtx(x, y, items){
     const row = document.createElement('button');
     row.className = 'ctx-row' + (it.danger ? ' danger' : '') + (it.items ? ' has-sub' : '');
     row.setAttribute('role', 'menuitem');
-    row.innerHTML = `<span>${it.items ? '<i class="sw-dot" style="background:' + (it.dot || 'transparent') + '"></i>' : ''}${esc(it.label)}</span>`
+    const lead = it.dot ? `<i class="sw-dot" style="background:${it.dot}"></i>`
+      : (it.check ? `<i class="ctx-tick${it.check() ? ' on' : ''}">${it.check() ? '✓' : ''}</i>` : '');
+    row.innerHTML = `<span>${lead}${esc(it.label)}</span>`
                   + (it.items ? '<i class="kb">▸</i>' : (it.key ? `<i class="kb">${esc(it.key)}</i>` : ''));
     if (it.need && !it.need()) row.classList.add('disabled');
     else if (it.items){
