@@ -24,8 +24,12 @@ const idb = {
   async open(){
     if (this.db) return this.db;
     this.db = await new Promise((res, rej) => {
-      const r = indexedDB.open('nookstacks', 1);
-      r.onupgradeneeded = () => r.result.createObjectStore('blobs');
+      const r = indexedDB.open('nookstacks', 2);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains('blobs')) d.createObjectStore('blobs');
+        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+      };
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
     });
@@ -42,37 +46,64 @@ const idb = {
       t.objectStore('blobs').delete(key); t.oncomplete = res; }); }
 };
 
+/* No server and no desktop shell (a static host, a file:// copy): the browser's
+   own IndexedDB becomes the vault. Same interface, so nothing above it changes. */
+const localVault = {
+  kind: 'local', ok: true, path: '',
+  async ping(){ return true; },
+  async getState(){
+    const d = await idb.open();
+    const rec = await new Promise((res, rej) => { const t = d.transaction('kv','readonly');
+      const q = t.objectStore('kv').get('state'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+    return rec ? { state: rec.state, saved: rec.saved } : { state: null, saved: 0 };
+  },
+  async putState(state){
+    const d = await idb.open(), saved = Date.now();
+    await new Promise((res, rej) => { const t = d.transaction('kv','readwrite');
+      t.objectStore('kv').put({ state, saved }, 'state'); t.oncomplete = res; t.onerror = () => rej(t.error); });
+    return { saved };
+  },
+  async getBlob(id){ try { const rec = await idb.get(id); return rec ? rec.blob : null; } catch { return null; } },
+  async putBlob(id, blob){ await idb.put(id, { blob, name: blob.name, type: blob.type }); },
+  async delBlob(){},
+  async pick(){ return null; },
+  async importPaths(){ return []; },
+  async exportBundle(){ return { error: 'export needs the desktop app or the dev server' }; },
+  async importBundle(){ return { error: 'import needs the desktop app or the dev server' }; }
+};
+
 /* ---------------------------------------------------------------- seed */
 function seed(){
   const mk = (kind, title, x, y, w, h, extra = {}) => ({ id: 'o' + Math.random().toString(36).slice(2, 9), kind, title, x, y, w, h, ...extra });
   return { levels: [
-    { id:'eng', name:'Engineering', shelves:[
-      { id:'stormbreaker', name:'STORMBREAKER', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g1', name:'THERMALS', x:60, y:90, w:530, h:290 },
-          { id:'g2', name:'POWER', x:612, y:90, w:300, h:230 },
-          { id:'g3', name:'AGENTS', x:60, y:420, w:470, h:190 } ],
+    { id:'studio', name:'Studio', shelves:[
+      { id:'aurora', name:'Aurora', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g1', name:'DESIGN', x:220, y:215, w:700, h:280, color:'sky' },
+          { id:'g2', name:'BUILD', x:950, y:215, w:370, h:280, color:'rose' },
+          { id:'g3', name:'DOCS', x:220, y:530, w:800, h:280, color:'mint' } ],
         docs:[
-          mk('note','Ryzen 5 5500', 84, 140, 250, 170, { text:'<p>93&nbsp;°C under load with the stock cooler. Replaced paste and the top exhaust; idles at 41&nbsp;°C now.</p>' }),
-          mk('text','Cooling plan.md', 352, 140, 210, 210, { text:'# Targets\n\n- CPU under 80 °C sustained\n- Case pressure neutral\n\nTwo 120 mm in,\none 140 mm out,\nbottom filtered.' }),
-          mk('note','Loose cable', 634, 140, 250, 150, { text:'<p>Intermittent shutdown traced to a partially seated 24-pin. Reseated, then cable-tied to the frame.</p>' }),
-          mk('note','Gateway', 84, 460, 420, 120, { text:'<p>One multiplexed host gateway serves default, archimedes and mnemosyne.</p>' })
+          mk('note','Kickoff', 250, 250, 300, 160, { text:'<p>Scope settled: three deliverables, one review a fortnight.</p>' }),
+          mk('text','spec.md', 600, 250, 340, 215, { text:'# Goals\n\n- First build by Friday\n- API stays under 200 ms\n\nTwo reviewers per change.' }),
+          mk('note','Open questions', 980, 250, 300, 175, { text:'<p>Do we need offline mode in v1? Settle it before the design review.</p>' }),
+          mk('note','Week one', 250, 560, 320, 180, { text:'<p>Wireframes approved on Monday. The copy still needs a second pass.</p>' }),
+          mk('text','release-notes.md', 640, 600, 340, 190, { text:'## 1.4\n\n- Faster first paint\n- Fixed the export dialog\n- A smaller installer' })
         ] },
-      { id:'wetnoodle', name:'WETNOODLE', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g4', name:'ARCHIVE', x:70, y:100, w:540, h:400 } ],
-        docs:[ mk('note','Local memory', 96, 150, 260, 160, { text:'<p>Transcripts, skills and notes in one local SQLite archive.</p>' }) ] },
-      { id:'nookstacks', name:'NOOKSTACKS', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g5', name:'CONCEPT', x:70, y:100, w:540, h:400 } ],
-        docs:[ mk('note','The tower', 96, 150, 300, 170, { text:'<p>Category levels stacked vertically. Each level holds project bookshelves. Each bookshelf is an endless board.</p>' }) ] }
+      { id:'beacon', name:'Beacon', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g4', name:'NOTES', x:70, y:100, w:540, h:400, color:'violet' } ],
+        docs:[ mk('note','First sketch', 96, 150, 260, 160, { text:'<p>One board per project, nothing hidden behind a menu.</p>' }) ] },
+      { id:'atlas', name:'Atlas', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g5', name:'ARCHIVE', x:70, y:100, w:540, h:400, color:'amber' } ],
+        docs:[ mk('note','Older drafts', 96, 150, 300, 170, { text:'<p>Superseded designs, kept for reference.</p>' }) ] }
     ]},
-    { id:'games', name:'Games', shelves:[
-      { id:'suijin', name:'SUIJIN', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g6', name:'SYSTEMS', x:70, y:100, w:540, h:400 } ],
-        docs:[ mk('text','Movement.txt', 96, 150, 280, 200, { text:'Water-driven traversal.\nCurrents push the player;\nthe player redirects them.' }) ] }
+    { id:'product', name:'Product', shelves:[
+      { id:'lumen', name:'Lumen', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g6', name:'PLAN', x:70, y:100, w:540, h:400, color:'sky' } ],
+        docs:[ mk('text','roadmap.txt', 96, 150, 280, 200, { text:'Q1  ship the editor\nQ2  sharing\nQ3  mobile reader' }) ] }
     ]},
-    { id:'writing', name:'Writing', shelves:[
-      { id:'novel', name:'LONG PROJECT', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g7', name:'DRAFT', x:70, y:100, w:540, h:400 } ],
-        docs:[ mk('text','Chapter 1.md', 96, 150, 360, 280, { text:'# Chapter 1\n\nThe rain had stopped an hour before, which made the street louder rather than quieter.' }) ] }
+    { id:'archive', name:'Archive', shelves:[
+      { id:'notes', name:'Notes', pan:{x:0,y:0,z:1}, groups:[
+          { id:'g7', name:'READING', x:70, y:100, w:540, h:400, color:'mint' } ],
+        docs:[ mk('text','reading.md', 96, 150, 360, 280, { text:'# Reading\n\n- The Design of Everyday Things\n- Thinking in Systems' }) ] }
     ]}
   ]};
 }
@@ -420,13 +451,19 @@ function save(){
 }
 
 async function boot(){
-  const reachable = await vault.ping();
+  let reachable = await vault.ping();
+  if (!reachable && !DESKTOP){
+    Object.assign(vault, localVault);
+    reachable = true;
+    note('vault', 'no server — this browser keeps the board');
+  }
   if (reachable){
     try {
       const res = await vault.getState();
       if (res && res.state && res.state.levels && res.state.levels.length){
         db = res.state;
-        setSaveState('vault · ' + (res.saved ? new Date(res.saved).toLocaleString() : 'loaded'), 'ok');
+        setSaveState((vault.kind === 'local' ? 'this browser · ' : 'vault · ') +
+          (res.saved ? new Date(res.saved).toLocaleString() : 'loaded'), 'ok');
         if (DESKTOP && vault.path) document.getElementById('saveState').title = vault.path;
       } else {
         // first run on a fresh vault: adopt whatever this browser already had
@@ -434,7 +471,7 @@ async function boot(){
         if (local && local.levels && local.levels.length){ db = local; }
         storeReady = true;
         await vault.putState(db);
-        setSaveState('vault created', 'ok');
+        setSaveState(vault.kind === 'local' ? 'saved in this browser' : 'vault created', 'ok');
         if (DESKTOP && vault.path) document.getElementById('saveState').title = vault.path;
       }
     } catch (e){ note('errors', e); setSaveState('vault unreadable — using local copy', 'bad'); }
