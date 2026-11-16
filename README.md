@@ -21,7 +21,8 @@ own browser, never uploaded.
 - **Cards for anything** — notes, markdown, images, PDFs, audio, video, 3D models and plain files, each with the viewer it deserves.
 - **Regions** — coloured frames that group part of a board. They sit *behind* their contents, so you work inside one as if it weren't there; drag the tab and the region moves.
 - **Select in bulk** — click, `Ctrl`-click, `Shift`-click, or drag a box over the board. Whatever is selected moves together, cards and regions alike.
-- **Menus built per thing** — a note edits and copies its text, a model frames and wireframes, media plays and loops, a region recolours, the empty board makes new things.
+- **Menus built per thing** — a note edits and copies its text, a model frames and wireframes, media plays and loops, a region recolours, a category or a project renames and recolours, the empty board makes new things.
+- **Colour where you are** — give a category or a project one of eight hues and its row wears a faint wash of it, so a rail of twelve boards stays readable.
 - **A file, not a service** — one folder of JSON and blobs, autosaved, 40 rolling backups, 80 steps of undo. No account, no sync, no network.
 - **Boards travel** — *File → Export* writes a `.nks` bundle: the board, its regions and every file on it, in one zip. *Open board* reads it back. The desktop app asks where to save; the browser downloads it.
 - **Fits the screen you have** — a collapsible rail on desktop and tablet (`Ctrl+B`, or the thin bar it leaves behind), and on a phone the rail becomes a drawer, one finger pans, two pinch, and a long press opens the menu.
