@@ -1,227 +1,88 @@
 # Nookstacks
 
-![Nookstacks](docs/screenshot.png)
+A quiet place to put everything you're building.
 
-A tower of project bookshelves. Each category is a level, each level holds projects, each project is an infinite board where you place documents — notes, code, PDFs, images, video, 3D models — anywhere, at any size, and edit the text ones in place.
+Categories stack into projects, projects open onto an infinite board, and the board
+holds whatever the work actually is — notes, documents, drawings, PDFs, 3D models,
+audio, links, and the coloured regions that group them.
 
-Local only. No account, no sync service, no telemetry. Your board is a directory on your disk that you can back up, copy between machines, or open with a text editor.
+![The board](docs/screenshot.png)
 
-Windows and Linux.
+## What's in it
 
-## Install
+- **Cards for anything** — notes, markdown documents, images, PDFs, audio, video, 3D models (STL/OBJ) and plain files, each with the viewer it deserves.
+- **Regions** — coloured frames that group part of a board. They sit *behind* their contents, so you work inside one as if it weren't there; drag the tab and the region moves.
+- **Select in bulk** — click, `Ctrl`-click, `Shift`-click, or drag a box over the board. Whatever is selected moves together, cards and regions alike.
+- **Menus built per thing** — a note edits and copies its text, a model frames and wireframes, media plays and loops, a region recolours, the empty board makes new things.
+- **A file, not a service** — one folder of JSON and blobs, autosaved, 40 rolling backups, 80 steps of undo. No account, no sync, no network.
 
-Grab the installer for your system from [Releases](../../releases).
+## Regions
 
-**Windows** — run `Nookstacks_*_x64-setup.exe`. It installs per-user, so no administrator rights are needed. The `.msi` is there if you prefer MSI deployment.
+A region is a coloured frame that groups part of a board — thermals, power, infra.
+It never takes a click, so everything inside stays usable, and its tab is the
+handle: drag it and the region (with anything else selected) moves. Eight colours,
+right-click to pick one.
 
-**Linux** — take the `.AppImage`, make it executable, run it:
-
-```bash
-chmod +x Nookstacks_*.AppImage
-./Nookstacks_*.AppImage
-```
-
-Or use the `.deb` / `.rpm` for your distribution's package manager. Both pull in `libwebkit2gtk-4.1`, which the app renders with.
-
-## Where your data lives
-
-| OS | Path |
-|---|---|
-| Windows | `%APPDATA%\Nookstacks\vault` |
-| Linux | `~/.local/share/Nookstacks/vault` |
-
-Inside is the whole board:
-
-```
-state.json          every level, project, region and document
-state.json.bak      the previous save
-history/            rolling snapshots, the last 40 saves
-blobs/              imported files, one file per import
-```
-
-Saves are atomic — written to a temp file, fsynced, then renamed — so an interrupted write can't corrupt `state.json`. Set `NOOKSTACKS_VAULT=/some/path` to keep the vault somewhere else, such as a synced folder.
-
-## Using it
-
-| | |
-|---|---|
-| `↑` `↓` | change level |
-| `←` `→` | change project |
-| `N` | new note where the cursor is |
-| `G` | draw a region around things |
-| double-click a category or project name | rename it in place — `Enter` keeps, `Esc` cancels |
-| `S` | open settings |
-| `Ctrl+Z` / `Ctrl+Shift+Z` | undo / redo (80 steps) |
-| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy, cut, paste the selected card |
-| `Esc` | close the settings panel, cancel a region, deselect |
-| double-click a note | edit it, click away to save |
-| click + drag on empty board | draw a selection box; everything it touches is selected |
-| drag a region's tab | move that region, and anything else selected with it |
-| `Ctrl` + click a region tab | add the region to the selection |
-| `Ctrl`/`⌘` + click a card | add it to the selection, click again to drop it |
-| `Shift` + click a card | add it to the selection without toggling |
-| `Ctrl+A` | select every card on the board |
-| right-drag on empty board | pan the board |
-| wheel | zoom; over a scrollable document or a model, it scrolls or zooms that instead |
-| double-click a model | nothing — drag to orbit, wheel to zoom |
-
-### Regions
-
-A region is a frame drawn **behind** its contents and it never takes a click, so every card inside one stays fully usable — you can select, drag, edit, right-click and open things inside a region exactly as if it were not there.
-
-The **tab is the handle**: click it to select the region, drag it to move the region (bringing every other selected region and card with it), `Ctrl`-click several tabs to select them together, double-click the tab to rename it, or right-click it for the region menu. The corner handles resize it, and the ✕ or `Delete` removes the selected regions while leaving the cards inside them alone.
-
-Each region carries its own colour. Right-click → **Colour** opens eight swatches — amber, sky, mint, rose, violet, lime, orange, slate — and applies the choice to every selected region at once. The colour is stored with the region, so it survives a restart and travels inside an exported `.nks` board.
-
-![A region's Colour menu](docs/region-colour.png)
-
-### Selecting
-
-One click selects a card. `Ctrl`-click (or `⌘`-click) adds or removes one card, `Shift`-click adds without toggling, and dragging a box on empty board selects everything the box touches — the way the desktop picks up icons. Dragging any card in a selection moves the whole set — including any selected regions, so a card and its frame stay together — and Delete, Cut, Copy, Duplicate, Bring to front, Send to back and Centre all work on the selection rather than on one card.
-
-The board itself moves with **right-drag on empty canvas** only, so the left button is free for selecting and moving cards.
-
-![Drag a box to select](docs/selecting.png)
-
-### Right-click menus
-
-Right-clicking a card, a region or empty board opens a menu built for that thing:
-
-- **notes** — edit, copy the text, then cut/copy/duplicate/rename/z-order/delete
-- **documents** — edit, copy the text, save a copy
-- **images, PDFs, plain files** — open in a viewer over the board, save a copy
-- **3D models** — frame the model, reset the view, toggle wireframe
-- **video and audio** — play/pause, loop, open the player
-- **links** — open, copy the link
-- **regions** — rename, select the cards inside, fit to the region, delete
-- **empty board** — new note or document, paste, select all, fit, tidy, zoom, settings
-
-Every card menu also carries the clipboard and arrangement commands with their shortcuts shown on the right.
-
-![The menu for a 3D model](docs/context-menu.png)
+![A region and its colour menu](docs/region-colour.png)
 
 ## Themes
 
-Sixteen palettes ship with it, and each is only a set of colour tokens, so nothing in the interface needs to know a theme exists: **Obsidian** (near-black and amber), **Manuscript** (warm parchment), **Graphite** (steel blue), **Daylight** (light chrome, warm paper), **Electro** (electric cyan), **Lava** (molten orange), **Meadow** (grassy green), **Ocean** (deep teal), **Sakura** (plum and blossom pink), **Terminal** (phosphor green on black), **Ember** (dark wood and copper), **Neon** (synthwave magenta), **Iris** (violet dusk), **Mono** (high-contrast black and white), **Frost** (icy light blue) and **Sand** (desert light).
+Sixteen palettes — Obsidian, Manuscript, Graphite, Daylight, **Electro**, **Lava**,
+**Meadow**, **Ocean**, **Sakura**, **Terminal**, **Ember**, **Neon**, **Iris**,
+**Mono**, **Frost**, **Sand** — plus a **Custom** theme you build from five colours.
 
-**Custom** builds a theme from five colours you pick — background, surfaces, paper, text and accent. The rest of the tokens are derived from them (borders, muted greys, paper ink, hover states), so the result stays coherent. *Copy from* seeds those five from any built-in theme as a starting point.
+![Six of the sixteen themes](docs/themes.png)
 
-![Six of the themes](docs/themes.png)
+![Themes and settings](docs/settings.png)
 
-## The menu bar
+## Keys
 
-File, Edit, Preferences, View, Arrange, Extras and Help, along the top of the window — `Alt` + the first letter opens one, arrows walk it, `Enter` runs it.
+| | |
+|---|---|
+| `↑ ↓` / `← →` | change category / project |
+| `N` / `T` | new note / new document |
+| `G` | draw a region |
+| `F` | fit the board · `Ctrl` `+` `−` `0` zoom |
+| `Ctrl+Z` / `Ctrl+Shift+Z` | undo / redo |
+| `Ctrl+C` `X` `V` `D` | copy, cut, paste, duplicate |
+| `Ctrl+A` / `Del` | select all / delete |
+| right-drag | pan the board |
+| `S` | settings |
 
-- **File** — new note or document, import files, place from a URL, open a `.nks` board, export this board or the whole tower, quit
-- **Edit** — undo, redo, cut, copy, paste, duplicate, select all, delete, rename the project or the category
-- **Preferences** — preferences panel, theme, text size, export/import settings
-- **View** — fit, zoom in/out/actual size, board grid, reduce motion, show sidebar
-- **Arrange** — bring to front, send to back, tidy the board, centre the selection
-- **Extras** — open or copy the vault path, board info
-- **Help** — keyboard shortcuts, README, about
+## Install
 
-![The File menu](docs/menu-file.png)
+**Windows** — run `Nookstacks_0.1.0_x64-setup.exe`; it installs per-user, no admin needed.
 
-## Boards as files: `.nks`
+**Linux** — install the `.deb` (it pulls in `libwebkit2gtk-4.1`).
 
-A `.nks` file is one board, or the whole tower, in a single file you can email, back up or carry between machines.
-
-**File → Export this board…** (`Ctrl+Shift+E`) writes a bundle of the project you're on: its regions, its documents, and every file attached to them. **File → Export all projects…** does the same for everything.
-
-**File → Open board…** (`Ctrl+O`) reads one back. A single board arrives as a new project beside the one you're on; a whole-tower bundle asks first, then replaces what's open (your previous state stays in `vault/history`).
-
-Under the hood it's a zip:
-
-```
-nookstacks.json     format id, version, scope, name, which blobs are inside
-state.json          the board itself
-blobs/<hash>        every attached file, addressed by content hash
-```
-
-Blobs are keyed by hash and nothing in the state is an absolute path, so a board exported on Windows opens on Linux with nothing to relink. Importing twice does not duplicate the attached files, and a bundle from a newer Nookstacks is refused rather than half-read.
-
-**Preferences → Export settings… / Import settings…** does the same for just your preferences, as a small JSON file.
-
-## Settings and themes
-
-Click **⚙ Settings** at the bottom of the sidebar, or press `S`.
-
-**Themes** — the whole interface is drawn from one set of colour tokens, so a theme is a palette swap and every surface follows it:
-
-- **Obsidian** — near-black, amber accent, cream paper. The default.
-- **Manuscript** — warm browns and parchment, for long evenings.
-- **Graphite** — cool neutral with a steel-blue accent.
-- **Daylight** — light chrome and warm paper, for a bright room or a projector.
-
-![Settings](docs/settings.png)
-
-**Text size** — S / M / L, scaling card titles, note text and code.
-
-**Board grid** — turn the dotted grid off for a cleaner canvas.
-
-**Reduce motion** — disables board travel animation and zooming transitions. The app also honours your system's reduced-motion preference when this is left at Off.
-
-**Fit** frames every card and region on the shelf, however far it sits from the centre — park something 5000 px away and Fit zooms out until it is on screen too.
-
-**Tidy board** packs the shelf into balanced columns using each card's real width and height, and treats a region as one unit: its cards stack inside it and the region is measured to wrap them, so tidying cannot leave a card half in and half out. Shortest column wins, and the order the cards already read in is kept.
-
-**Undo** keeps the last 80 states of the board, so a tidy, a drag or a deletion is one `Ctrl+Z` away; typing in a note is coalesced into a single step. Copy and paste work on cards, and a pasted card shares the underlying file rather than duplicating it.
-
-**Board data → Open folder** — opens the vault directory in your file manager, so backups are one click away.
-
-Your choices are stored in `state.json` alongside the board, under `settings`, so they travel with the vault and survive reinstalls. **Reset to defaults** puts everything back to Obsidian, M, grid on, motion on.
-
-<p align="center">
-  <img src="docs/theme-manuscript.png" width="49%" alt="Manuscript theme">
-  <img src="docs/theme-graphite.png" width="49%" alt="Graphite theme">
-  <img src="docs/theme-daylight.png" width="49%" alt="Daylight theme">
-</p>
-
-## Build from source
-
-You need Rust 1.77 or newer. Then:
+**Browser** — the interface is plain HTML/CSS/JS over a small Python server:
 
 ```bash
-cd src-tauri
-cargo build --release
+python3 dev/server.py 8787        # http://localhost:8787
 ```
 
-On Linux you also need the WebKit headers:
+## Build your own installers
+
+Rust 1.77+ and the [Tauri CLI](https://tauri.app), plus `libwebkit2gtk-4.1-dev`,
+`libgtk-3-dev`, `librsvg2-dev` and `patchelf` on Linux.
 
 ```bash
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
+cargo tauri build --bundles nsis   # Windows
+cargo tauri build --bundles deb    # Linux
 ```
 
-Installers:
+Output lands in `src-tauri/target/release/bundle/`.
 
-```bash
-cargo install tauri-cli --version "^2"
-cd src-tauri && cargo tauri build
-```
-
-Output lands in `src-tauri/target/release/bundle/`. On Linux that's `deb/`, `rpm/` and `appimage/`; on Windows, `nsis/` and `msi/`. Each OS builds its own installers — CI does both in `.github/workflows/build.yml`, and pushing a `v*` tag publishes them to a draft release.
-
-## How it's put together
-
-The same web bundle runs in two shells:
+## Your data
 
 ```
-web/                 the entire interface, plain ES modules, no build step
-web/style.css        layout, driven entirely by colour tokens
-web/themes.css       the palettes: one block of variables per theme
-src-tauri/           the desktop shell: Rust, file system, installers
-dev/server.py        a small HTTP server with the same API, for browser dev
+state.json     every category, project, region and card
+history/       the last 40 saves
+blobs/         imported files, one per import
 ```
 
-`web/app.js` has one storage interface (`vault`) with two implementations. Inside the Tauri window it calls Rust over IPC; in a browser it calls `/api/*` on the dev server. Both write the identical on-disk format, so a vault is portable between the app and the dev server.
-
-Three.js, the `.blend` parser and the Zstandard decoder are vendored under `web/vendor/`, so there is no `npm install` and no bundler anywhere in the build.
-
-Working on the interface without rebuilding Rust:
-
-```bash
-python3 dev/server.py 8787   # then open http://localhost:8787
-```
+Windows: `%APPDATA%\Nookstacks\vault` · Linux: `~/.local/share/Nookstacks/vault`.
+Set `NOOKSTACKS_VAULT` to keep it somewhere else, like a synced folder.
 
 ## License
 
