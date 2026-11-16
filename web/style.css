@@ -1,3 +1,6 @@
+/* the hidden attribute must win over any author display rule (e.g. .sgroup{display:flex}) */
+[hidden]{display:none !important}
+
 @font-face { font-family: Inter; src: url("fonts/Inter-400.woff2"); font-weight: 400; }
 @font-face { font-family: Inter; src: url("fonts/Inter-500.woff2"); font-weight: 500; }
 @font-face { font-family: Inter; src: url("fonts/Inter-600.woff2"); font-weight: 600; }
