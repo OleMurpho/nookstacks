@@ -1,0 +1,78 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "route"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -122.42,
+      37.77
+     ],
+     [
+      -122.4,
+      37.78
+     ],
+     [
+      -122.38,
+      37.775
+     ],
+     [
+      -122.36,
+      37.79
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "yard"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -122.43,
+       37.76
+      ],
+      [
+       -122.41,
+       37.76
+      ],
+      [
+       -122.41,
+       37.75
+      ],
+      [
+       -122.43,
+       37.75
+      ],
+      [
+       -122.43,
+       37.76
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "bench"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -122.395,
+     37.783
+    ]
+   }
+  }
+ ]
+}

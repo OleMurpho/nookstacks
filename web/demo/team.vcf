@@ -1,0 +1,14 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Example Person
+ORG:Example Engineering
+TITLE:Mechatronics
+TEL;TYPE=WORK:+1 555 0100
+EMAIL:person@example.com
+END:VCARD
+BEGIN:VCARD
+VERSION:3.0
+FN:Second Person
+ORG:Example Robotics
+EMAIL:two@example.com
+END:VCARD

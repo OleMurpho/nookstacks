@@ -1,0 +1,6 @@
+graph LR
+  A[note] --> B[document]
+  B --> C{viewer}
+  C -->|text| D[edit in place]
+  C -->|binary| E[open with a parser]
+  E --> F[same card]

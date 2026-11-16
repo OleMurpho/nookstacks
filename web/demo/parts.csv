@@ -1,0 +1,41 @@
+part,qty,unit cost,supplier,notes
+BRK-1001,3,2.35,Acme,
+BRK-1002,6,4.70,Volt,
+BRK-1003,9,7.05,Kestrel,
+BRK-1004,12,9.40,Acme,
+BRK-1005,15,11.75,Kestrel,
+BRK-1006,18,14.10,Kestrel,
+BRK-1007,21,16.45,Acme,"has, comma"
+BRK-1008,24,18.80,Acme,
+BRK-1009,27,21.15,Volt,
+BRK-1010,30,23.50,Acme,
+BRK-1011,33,25.85,Acme,"quote "" inside"
+BRK-1012,36,28.20,Acme,
+BRK-1013,39,30.55,Acme,
+BRK-1014,42,32.90,Acme,"has, comma"
+BRK-1015,45,35.25,Kestrel,
+BRK-1016,48,37.60,Volt,
+BRK-1017,51,39.95,Volt,
+BRK-1018,54,42.30,Volt,
+BRK-1019,57,44.65,Volt,
+BRK-1020,60,47.00,Kestrel,
+BRK-1021,63,49.35,Acme,"has, comma"
+BRK-1022,66,51.70,Acme,"quote "" inside"
+BRK-1023,69,54.05,Volt,
+BRK-1024,72,56.40,Volt,
+BRK-1025,75,58.75,Acme,
+BRK-1026,78,61.10,Volt,
+BRK-1027,81,63.45,Acme,
+BRK-1028,84,65.80,Kestrel,"has, comma"
+BRK-1029,87,68.15,Volt,
+BRK-1030,90,70.50,Kestrel,
+BRK-1031,93,72.85,Kestrel,
+BRK-1032,96,75.20,Acme,
+BRK-1033,99,77.55,Acme,"quote "" inside"
+BRK-1034,102,79.90,Acme,
+BRK-1035,105,82.25,Acme,"has, comma"
+BRK-1036,108,84.60,Acme,
+BRK-1037,111,86.95,Acme,
+BRK-1038,114,89.30,Kestrel,
+BRK-1039,117,91.65,Volt,
+BRK-1040,120,94.00,Acme,

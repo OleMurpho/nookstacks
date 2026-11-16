@@ -1,0 +1,8 @@
+[project]
+name = "nookstacks"
+version = "0.1.0"
+dependencies = ["tauri", "three"]
+
+[build]
+target = "wasm32"
+flags = [1, 2, 3]

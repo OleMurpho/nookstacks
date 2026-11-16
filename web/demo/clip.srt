@@ -1,0 +1,11 @@
+1
+00:00:00,500 --> 00:00:03,000
+The board is a canvas.
+
+2
+00:00:03,200 --> 00:00:06,400
+Every card is a document you can open.
+
+3
+00:00:06,600 --> 00:00:09,000
+Right-drag to pan. Long-press on touch.

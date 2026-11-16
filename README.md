@@ -16,13 +16,30 @@ kind of card, and whatever you do there is kept in your own browser, never uploa
 
 ## What's in it
 
-- **Cards for anything** — notes, markdown documents, images, PDFs, audio, video, 3D models (STL/OBJ) and plain files, each with the viewer it deserves.
+- **Cards for anything** — notes, markdown, images, PDFs, audio, video, 3D models and plain files, each with the viewer it deserves.
 - **Regions** — coloured frames that group part of a board. They sit *behind* their contents, so you work inside one as if it weren't there; drag the tab and the region moves.
 - **Select in bulk** — click, `Ctrl`-click, `Shift`-click, or drag a box over the board. Whatever is selected moves together, cards and regions alike.
 - **Menus built per thing** — a note edits and copies its text, a model frames and wireframes, media plays and loops, a region recolours, the empty board makes new things.
 - **A file, not a service** — one folder of JSON and blobs, autosaved, 40 rolling backups, 80 steps of undo. No account, no sync, no network.
 - **Boards travel** — *File → Export* writes a `.nks` bundle: the board, its regions and every file on it, in one zip. *Open board* reads it back. The desktop app asks where to save; the browser downloads it.
 - **Fits the screen you have** — a collapsible rail on desktop and tablet (`Ctrl+B`, or the thin bar it leaves behind), and on a phone the rail becomes a drawer, one finger pans, two pinch, and a long press opens the menu.
+
+## What it opens
+
+A card is not a file icon. It is the file, read in place:
+
+- **Sheets** — xlsx, xls, ods, csv and tsv as a grid, with sheet tabs and a row gutter.
+- **Documents** — PDF, markdown and text edited where they sit; notebooks (`ipynb`) with their outputs; `epub` and `fb2` as chapters.
+- **Data** — json, yaml, toml and xml as a collapsible tree, with the source one click away and editable.
+- **Drawings** — DXF as vector geometry; 3MF, GLB, GLTF, OBJ, STL, PLY, FBX and Blender files as models you can orbit; mermaid diagrams rendered from source.
+- **Sound and film** — mp3, wav, ogg, m4a, flac, mp4, webm, mov, mkv; MIDI as a piano roll that plays.
+- **Lists and containers** — zip and tar as a browsable listing you can pull files out of; subtitles as cues; `ics` calendars and `vcf` contacts; geojson, gpx and kml on a canvas.
+- **Fonts** — ttf, otf, woff and woff2 as a live specimen.
+
+Anything else keeps the plain tile and a download link. Parsers are fetched the first
+time a card needs one, so opening a board of notes costs nothing.
+
+![Spreadsheets, a notebook and a data tree](docs/viewers.jpg)
 
 ## Regions
 

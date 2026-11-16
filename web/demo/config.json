@@ -1,0 +1,25 @@
+{
+  "name": "stormbreaker",
+  "version": 3,
+  "agents": [
+    {
+      "id": "mnemosyne",
+      "model": "v4.1",
+      "channels": [
+        "#mnemosyne"
+      ]
+    },
+    {
+      "id": "archimedes",
+      "model": "v4",
+      "channels": [
+        "#archimedes"
+      ]
+    }
+  ],
+  "limits": {
+    "ram_gb": 32,
+    "gpu": null,
+    "ok": true
+  }
+}

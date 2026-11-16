@@ -1,12 +1,33 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import { STLLoader } from 'three/addons/loaders/STLLoader.js';
-import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
-import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
-import { parseBlend, createObjects } from './vendor/blend/index.js';
+/* three.js and its loaders are ~1.7 MB: they are fetched the first time a card
+   actually needs a 3d view, not on every visit. Everything below this line that
+   touches THREE waits for threeReady first. */
+let THREE = null, OrbitControls = null, GLTFLoader = null, OBJLoader = null,
+    STLLoader = null, FBXLoader = null, PLYLoader = null, ColladaLoader = null,
+    parseBlend = null, createObjects = null;
+let threeReady = null;
+function loadThree(){
+  if (threeReady) return threeReady;
+  threeReady = (async () => {
+  const t0 = performance.now();
+  THREE = await import('three');
+  const [oc, gltf, obj, stl, fbx, ply, dae, blend] = await Promise.all([
+    import('three/addons/controls/OrbitControls.js'),
+    import('three/addons/loaders/GLTFLoader.js'),
+    import('three/addons/loaders/OBJLoader.js'),
+    import('three/addons/loaders/STLLoader.js'),
+    import('three/addons/loaders/FBXLoader.js'),
+    import('three/addons/loaders/PLYLoader.js'),
+    import('three/addons/loaders/ColladaLoader.js'),
+    import('./vendor/blend/index.js')
+  ]);
+  OrbitControls = oc.OrbitControls; GLTFLoader = gltf.GLTFLoader; OBJLoader = obj.OBJLoader;
+  STLLoader = stl.STLLoader; FBXLoader = fbx.FBXLoader; PLYLoader = ply.PLYLoader;
+  ColladaLoader = dae.ColladaLoader; parseBlend = blend.parseBlend; createObjects = blend.createObjects;
+  window.__threeMs = Math.round(performance.now() - t0);
+  return THREE;
+  })();
+  return threeReady;
+}
 
 /* ---------------------------------------------------------------- consts */
 const SW = 1240, SH = 780, RAIL_FULL = 232, RAIL_BAR = 46;
@@ -17,7 +38,23 @@ const railW = () => isPhone() ? 0
   : (innerWidth <= 1024 ? 198 : RAIL_FULL);
 const RAILW = RAIL_FULL;   // legacy constant: full width of the column
 const LKEY = 'nookstacks.v3';
-const TEXT_EXT = /\.(txt|md|markdown|csv|json|ya?ml|toml|ini|cfg|conf|log|xml|html?|css|js|mjs|ts|tsx|jsx|py|rb|go|rs|c|h|cpp|hpp|cs|java|kt|lua|sh|bash|zsh|sql|glsl|hlsl|vsh|fsh|vue|svelte)$/i;
+const TEXT_EXT = /\.(txt|md|markdown|ini|cfg|conf|log|html?|css|js|mjs|ts|tsx|jsx|py|rb|go|rs|c|h|cpp|hpp|cs|java|kt|lua|sh|bash|zsh|sql|glsl|hlsl|vsh|fsh|vue|svelte)$/i;
+const SHEET_EXT = /\.(csv|tsv|xlsx|xlsm|xlsb|xls|ods)$/i;
+const DATA_EXT  = /\.(json|jsonc|yaml|yml|toml|xml|plist)$/i;
+const NOTEBOOK_EXT = /\.ipynb$/i;
+const FONT_EXT  = /\.(ttf|otf|woff2?|eot)$/i;
+const ZIP_EXT   = /\.(zip|7z|rar)$/i;
+const TAR_EXT   = /\.(tar|tgz)$|(\.tar\.gz)$/i;
+const GZ_EXT    = /\.gz$/i;
+const SUB_EXT   = /\.(srt|vtt|ass|ssa|sbv)$/i;
+const CAL_EXT   = /\.ics$/i;
+const VCF_EXT   = /\.vcf$/i;
+const BOOK_EXT  = /\.(epub|fb2)$/i;
+const CAD_EXT   = /\.(dxf)$/i;
+const MIDI_EXT  = /\.(mid|midi)$/i;
+const MESH_EXT  = /\.3mf$/i;
+const DIAG_EXT  = /\.(mmd|mermaid)$/i;
+const MAP_EXT   = /\.(geojson|gpx|kml)$/i;
 const MODEL_EXT = /\.(glb|gltf|obj|stl|fbx|ply|dae|blend)$/i;
 const IMG_EXT = /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i;
 const PDF_EXT = /\.pdf$/i;
@@ -274,10 +311,33 @@ function seed(){
           demo('file','example.zip','example.zip','zip', 1210, 1090, 320, 170, { size: 177 })
         ] },
       { id:'ex1s2', name:'Example Project 2', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g5', name:'A SECOND BOARD', x:60, y:60, w:700, h:420, color:'rose' } ],
+          { id:'g5', name:'SHEETS AND DATA', x:20, y:60, w:1240, h:1000, color:'amber' },
+          { id:'g8', name:'DOCUMENTS AND DIAGRAMS', x:1220, y:60, w:1040, h:1000, color:'sky' },
+          { id:'g9', name:'DRAWINGS AND SOUND', x:20, y:1080, w:2220, h:600, color:'violet' },
+          { id:'g10', name:'FILES AND LISTS', x:20, y:1620, w:2220, h:940, color:'mint' } ],
         docs:[
-          mk('note','Every project gets its own infinite board', 100, 110, 380, 220, { text:'<p>Nothing is shared between boards. Move around with the arrow keys, or click a project in the rail.</p>' }),
-          mk('note','Right-click anything', 520, 110, 200, 220, { text:'<p>A note, a model and a region each get their own menu.</p>' })
+          mk('note','Every other kind of file', 60, 2180, 560, 200, { text:'<p>The same board, opened with a viewer for each kind: a sheet grid, a notebook, a tree, a font specimen, an archive listing, subtitles, a calendar, contacts, a book, a drawing, a piano roll, a mesh, a diagram and a map.</p><p>Anything without a viewer keeps the plain file tile and a download link.</p>' }),
+
+          demo('sheet','inventory.xlsx','inventory.xlsx','xlsx', 60, 100, 560, 440),
+          demo('sheet','parts.csv','parts.csv','csv', 660, 100, 560, 440),
+          demo('notebook','ring-buffer.ipynb','ring-buffer.ipynb','ipynb', 60, 600, 560, 460),
+          demo('data','config.json','config.json','json', 660, 600, 560, 460),
+
+          demo('font','example-font.ttf','example-font.ttf','ttf', 1260, 100, 460, 440),
+          demo('diagram','flow.mmd','flow.mmd','mmd', 1760, 100, 460, 440),
+          demo('data','settings.yaml','settings.yaml','yaml', 1260, 600, 460, 460),
+          demo('data','pyproject.toml','pyproject.toml','toml', 1760, 600, 460, 460),
+
+          demo('cad','bracket.dxf','bracket.dxf','dxf', 60, 1120, 560, 480),
+          demo('mesh3mf','cube.3mf','cube.3mf','3mf', 660, 1120, 560, 480),
+          demo('ebook','field-notes.epub','field-notes.epub','epub', 1260, 1120, 460, 520),
+          demo('midi','scale.mid','scale.mid','mid', 1760, 1120, 460, 400),
+
+          demo('archive','bundle.zip','bundle.zip','zip', 60, 1660, 560, 460),
+          demo('subtitle','clip.srt','clip.srt','srt', 660, 1660, 560, 420),
+          demo('calendar','schedule.ics','schedule.ics','ics', 1260, 1660, 460, 420),
+          demo('contact','team.vcf','team.vcf','vcf', 1760, 1660, 460, 360),
+          demo('geo','site.geojson','site.geojson','geojson', 60, 2410, 560, 460)
         ] },
       { id:'ex1s3', name:'Example Project 3', pan:{x:0,y:0,z:1}, groups:[],
         docs:[ mk('note','An empty-ish board', 120, 120, 340, 180, { text:'<p>Press <b>N</b> for a note, <b>T</b> for a document, <b>G</b> to draw a region.</p>' }) ] }
@@ -415,7 +475,7 @@ const vault = {
   }
 };
 
-const DEMO_VERSION = 3;
+const DEMO_VERSION = 4;
 let db = seed();
 
 /* ---------------------------------------------------------------- settings */
@@ -627,6 +687,7 @@ const curShelf = () => curLevel().shelves[shelf];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function save(){
+  if (window.__scratch) return;      // ?fresh=1 never writes over a real board
   histPush();
   // mirror locally first: even if the server write fails, this tab keeps working
   try { localStorage.setItem(LKEY, JSON.stringify(db)); } catch {}
@@ -645,6 +706,19 @@ function save(){
 }
 
 async function boot(){
+  // ?fresh=1 opens an empty board and leaves storage alone: a clean slate for
+  // measuring, and a way out of a board that will not load.
+  const fresh = /[?&]fresh=1/.test(location.search);
+  if (fresh){
+    db = { levels: [{ name: 'Level 1', shelves: [{ name: 'Board 1', docs: [], groups: [] }] }],
+           settings: { ...DEFAULT_SETTINGS } };
+    window.__scratch = true;
+    applySettings(); bootRail(); wireRailToggle(); render();
+    window.__bootMs = Math.round(performance.now() - __t0);
+    setSaveState('scratch board', 'ok');
+    document.body.classList.remove('booting');
+    return;
+  }
   let reachable = await vault.ping();
   if (!reachable && !DESKTOP){
     Object.assign(vault, localVault);
@@ -717,19 +791,51 @@ function blobUrlFor(doc){
   if (u) resolveBlobUrl(doc);
   return urls.get(doc.id) || null;
 }
-async function resolveBlobUrl(doc){
-  let blob = null;
+/* A board can open with twenty cards at once. Fetches go through a small queue:
+   browsers only open six connections per host, and a burst of twenty looks like
+   a stampede to a small server. */
+let blobActive = 0; const blobQueue = [];
+function blobSlot(){
+  return new Promise(res => {
+    if (blobActive < 4){ blobActive++; res(); }
+    else blobQueue.push(res);
+  });
+}
+function blobFree(){
+  blobActive--;
+  const next = blobQueue.shift();
+  if (next){ blobActive++; next(); }
+}
+
+async function blobFor(doc){
   if (doc.blobId && vault.ok){
-    try { blob = await vault.getBlob(doc.blobId); } catch {}
+    try { const b = await vault.getBlob(doc.blobId); if (b) return b; } catch {}
   }
-  if (!blob && doc.blobId){
+  if (doc.blobId){
     const rec = await idb.get(doc.blobId);
-    if (rec) blob = rec.blob;
+    if (rec) return rec.blob;
   }
   // demo cards ship their file beside the app instead of in the vault
-  if (!blob && doc.src){
-    try { const r = await fetch(doc.src); if (r.ok) blob = await r.blob(); } catch {}
+  if (doc.src){
+    await blobSlot();
+    try {
+      // one retry: a burst of cards must not leave a reader with an empty one
+      for (let attempt = 0; attempt < 2; attempt++){
+        try {
+          const r = await fetch(doc.src + (attempt ? '?r=' + Date.now() : ''));
+          if (r.ok) return await r.blob();
+          console.warn('blobFor: HTTP ' + r.status + ' for ' + doc.src);
+        } catch (e){
+          console.warn('blobFor: ' + (e && e.message) + ' for ' + doc.src);
+          await new Promise(r2 => setTimeout(r2, 150));
+        }
+      }
+    } finally { blobFree(); }
   }
+  return null;
+}
+async function resolveBlobUrl(doc){
+  const blob = await blobFor(doc);
   if (!blob) return;
   urls.set(doc.id, URL.createObjectURL(blob));
   if (findDoc(doc.id)) render();
@@ -744,6 +850,8 @@ async function storeBlob(id, blob){
 }
 
 function bodyHTML(doc){
+  const V = window.NK_VIEWERS && window.NK_VIEWERS[doc.kind];
+  if (V && V.html) return V.html(doc, NKAPI);
   switch (doc.kind){
     case 'note':
       return `<div class="body pad" contenteditable="false" spellcheck="false">${doc.text || '<p><br></p>'}</div>`;
@@ -751,7 +859,7 @@ function bodyHTML(doc){
       return `<div class="body"><textarea spellcheck="false">${esc(doc.text || '')}</textarea></div>`;
     case 'image': {
       const u = urls.get(doc.id);
-      return `<div class="body">${u ? `<img src="${u}" alt="">` : `<div class="filletile">loading…</div>`}</div>`;
+      return `<div class="body">${u ? `<img src="${u}" alt="" loading="lazy" decoding="async">` : `<div class="filletile">loading…</div>`}</div>`;
     }
     case 'pdf': {
       const u = urls.get(doc.id);
@@ -759,7 +867,8 @@ function bodyHTML(doc){
     }
     case 'video': {
       const u = urls.get(doc.id);
-      return `<div class="body">${u ? `<video src="${u}" controls></video>` : `<div class="filletile">loading…</div>`}</div>`;
+      // metadata only: a board with twelve clips should not fetch twelve buffers
+      return `<div class="body">${u ? `<video src="${u}" controls preload="metadata" playsinline></video>` : `<div class="filletile">loading…</div>`}</div>`;
     }
     case 'audio': {
       const u = urls.get(doc.id);
@@ -787,7 +896,8 @@ function hydrate(el, doc){
 
 function objHTML(doc){
   const dark = !['note','text'].includes(doc.kind);
-  const badge = { note:'note', text:'doc', image:'image', pdf:'pdf', model:'3d', video:'video', audio:'audio', link:'web', file:'file' }[doc.kind] || 'file';
+  const badge = { note:'note', text:'doc', image:'image', pdf:'pdf', model:'3d', video:'video', audio:'audio', link:'web', file:'file' }[doc.kind]
+    || (window.NK_VIEWERS && window.NK_VIEWERS[doc.kind] && window.NK_VIEWERS[doc.kind].badge) || 'file';
   return `<article class="obj ${dark ? 'dark' : ''}" data-id="${doc.id}"
       style="left:${doc.x}px; top:${doc.y}px; width:${doc.w}px; height:${doc.h}px">
     <div class="head"><span class="title">${esc(doc.title)}</span><span class="badge">${badge}</span>
@@ -799,7 +909,8 @@ function objHTML(doc){
 }
 
 /* ---------------------------------------------------------------- 3d */
-function makeViewer(canvas, doc){
+async function makeViewer(canvas, doc){
+  await loadThree();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, powerPreference:'low-power' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   const scene = new THREE.Scene();
@@ -1001,7 +1112,9 @@ function render(){
     el.querySelector('.close').onclick = e => { e.stopPropagation(); removeDoc(doc.id); };
     if (doc.kind === 'model'){
       const canvas = el.querySelector('canvas.mesh');
-      if (canvas) viewers.push(makeViewer(canvas, doc));
+      if (canvas) makeViewer(canvas, doc).then(v => {
+        if (v && document.body.contains(canvas)) viewers.push(v); else if (v && v.dispose) v.dispose();
+      }).catch(() => {});
     }
     if (sel.has(doc.id)) el.classList.add('selected');
   });
@@ -1230,6 +1343,16 @@ function addProject(){
 function wireBody(el, doc){
   const body = el.querySelector('.body');
   if (!body) return;
+  const V = window.NK_VIEWERS && window.NK_VIEWERS[doc.kind];
+  if (V && V.wire){
+    Promise.resolve()
+      .then(() => V.wire(el, doc, NKAPI))
+      .catch(err => {
+        const w = el.querySelector('.vwrap');
+        if (w) w.innerHTML = `<div class="vload bad">${esc(err && err.message || err)}</div>`;
+        note('viewer', err);
+      });
+  }
   if (doc.kind === 'note'){
     body.addEventListener('input', () => { doc.text = body.innerHTML; save(); });
     body.addEventListener('mousedown', e => { if (e.button === 0) e.stopPropagation(); });
@@ -1258,6 +1381,8 @@ function wireBody(el, doc){
     const ta = body.querySelector('textarea');
     if (ta) ta.addEventListener('input', () => { doc.text = ta.value; save(); });
   }
+  const ex = el.querySelector('.vexpand');
+  if (ex) ex.addEventListener('click', e => { e.stopPropagation(); toggleExpand(doc); });
   body.addEventListener('dblclick', e => e.stopPropagation());
 }
 
@@ -1454,6 +1579,20 @@ function removeDoc(id){
 }
 
 function kindFor(name){
+  if (SHEET_EXT.test(name)) return 'sheet';
+  if (NOTEBOOK_EXT.test(name)) return 'notebook';
+  if (MAP_EXT.test(name)) return 'geo';
+  if (DATA_EXT.test(name)) return 'data';
+  if (FONT_EXT.test(name)) return 'font';
+  if (SUB_EXT.test(name)) return 'subtitle';
+  if (CAL_EXT.test(name)) return 'calendar';
+  if (VCF_EXT.test(name)) return 'contact';
+  if (BOOK_EXT.test(name)) return 'ebook';
+  if (CAD_EXT.test(name)) return 'cad';
+  if (MIDI_EXT.test(name)) return 'midi';
+  if (MESH_EXT.test(name)) return 'mesh3mf';
+  if (DIAG_EXT.test(name)) return 'diagram';
+  if (ZIP_EXT.test(name) || TAR_EXT.test(name) || GZ_EXT.test(name)) return 'archive';
   if (MODEL_EXT.test(name)) return 'model';
   if (PDF_EXT.test(name)) return 'pdf';
   if (IMG_EXT.test(name)) return 'image';
@@ -1466,8 +1605,9 @@ function kindFor(name){
 function placeDoc(meta, at){
   const kind = meta.kind || kindFor(meta.name);
   const p = at || screenToPanel(innerWidth/2, innerHeight/2);
-  const w = kind === 'image' ? 360 : kind === 'pdf' ? 420 : kind === 'model' ? 420 : 340;
-  const h = kind === 'image' ? 260 : kind === 'pdf' ? 520 : kind === 'model' ? 320 : 300;
+  const vs = (window.NK_VIEWERS && window.NK_VIEWERS[kind] && window.NK_VIEWERS[kind].size) || null;
+  const w = vs ? vs[0] : kind === 'image' ? 360 : kind === 'pdf' ? 420 : kind === 'model' ? 420 : 340;
+  const h = vs ? vs[1] : kind === 'image' ? 260 : kind === 'pdf' ? 520 : kind === 'model' ? 320 : 300;
   const k = curShelf().docs.length;
   const doc = { id:'o'+Math.random().toString(36).slice(2,9), kind, title:meta.name,
     x:p.x - w/2 + (k % 3) * (w + 26), y:p.y - h/2 + Math.floor(k / 3) * (h + 22),
@@ -1484,7 +1624,8 @@ async function addFiles(files, at){
     await storeBlob(id, f);
     const ext = (f.name.split('.').pop() || '').toLowerCase();
     let text = null;
-    if (kind === 'text') text = await f.text();
+    if (kind === 'text' || kind === 'notebook') text = await f.text();
+    else if (kind === 'data' && f.size < 4 << 20) text = await f.text();
     const doc = placeDoc({ name:f.name, ext, kind, blobId:id, size:f.size, text }, at);
     const rec = await idb.get(id);
     if (rec) urls.set(doc.id, URL.createObjectURL(rec.blob));
@@ -2108,17 +2249,98 @@ $('#addProj').onclick = addProject;
 $('#navPrev').onclick = () => goShelf(shelf - 1);
 $('#navNext').onclick = () => goShelf(shelf + 1);
 
-/* boot */
-try { render(); } catch (e) {
-  window.__err = e.message + '\n' + (e.stack || '');
-  console.error(e);
+/* ------------------------------------------------------------ viewer api */
+async function addFileToBoard(name, blob){
+  const kind = kindFor(name);
+  const id = 'b' + Math.random().toString(36).slice(2, 10);
+  await storeBlob(id, blob);
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const doc = placeDoc({ name, ext, kind, blobId: id, size: blob.size, text: null });
+  urls.set(doc.id, URL.createObjectURL(blob));
+  save(); render();
+  return doc;
 }
+
+function toggleExpand(doc){
+  if (doc.__pre){
+    doc.w = doc.__pre[0]; doc.h = doc.__pre[1]; delete doc.__pre;
+  } else {
+    doc.__pre = [doc.w, doc.h];
+    doc.w = Math.round(Math.min(innerWidth - railW() - 80, Math.max(doc.w, innerWidth * 0.72)));
+    doc.h = Math.round(Math.min(innerHeight - 120, Math.max(doc.h, innerHeight * 0.68)));
+  }
+  save(); render();
+}
+
+async function showGeometry(canvas, geo){
+  await loadThree();
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 5000);
+  scene.add(new THREE.HemisphereLight(0xdce7ff, 0x1a1f26, 1.25));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 6, 4); scene.add(key);
+  const rim = new THREE.DirectionalLight(0xffd9a0, .7); rim.position.set(-4, 2, -3); scene.add(rim);
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = false;
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xc9d4e2, metalness: .08, roughness: .72, flatShading: true }));
+  scene.add(mesh);
+  const box = new THREE.Box3().setFromObject(mesh);
+  const size = box.getSize(new THREE.Vector3()).length() || 1;
+  const centre = box.getCenter(new THREE.Vector3());
+  mesh.position.sub(centre);
+  const dist = size * 1.35;
+  camera.position.set(dist * .6, dist * .45, dist * .8);
+  camera.near = Math.max(size / 500, 0.001); camera.far = size * 40; camera.updateProjectionMatrix();
+  controls.target.set(0, 0, 0); controls.update();
+  const draw = () => {
+    const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    renderer.setSize(r.width, r.height, false);
+    camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+  };
+  controls.addEventListener('change', draw);
+  new ResizeObserver(draw).observe(canvas);
+  draw();
+  // the 3d view keeps its own mouse: never let the board see these
+  for (const t of ['mousedown', 'wheel', 'pointerdown']) canvas.addEventListener(t, e => e.stopPropagation());
+  return { renderer, scene, camera, controls, draw };
+}
+
+const NKAPI = {
+  esc, urls, note, save, render, findDoc, blob: blobFor, addFile: addFileToBoard,
+  expand: toggleExpand, showGeometry,
+  ready: () => loadThree(),                     // three.js is imported on demand
+  get THREE(){ return THREE; },
+  get theme(){ return document.documentElement.dataset.theme || 'obsidian'; }
+};
+window.NKAPI = NKAPI;
+
+/* boot: boot() renders once, from the board that is actually loaded. Rendering
+   the seed here as well used to fetch every demo file for a frame nobody saw. */
+const __t0 = performance.now();
+window.__bootMs = Math.round(performance.now() - __t0);
+window.__navMs = Math.round(performance.now());
 window.__nookstacks = { get db(){ return db; }, vault, importNks, exportNks, setRail, toggleRail, railMode, fitView, wireRailToggle, addFiles, place, removeDoc, DBG,
   get cam(){ return { ...cam }; },
   get state(){ return { level, shelf, selected, selection: [...sel], docs: curShelf().docs.length }; },
   selectMany, toggleSel, clearSel,
   // test surface: drive layout and history without the mouse
   fitView, tidyBoard, render, undo, redo, select, save,
+  setCam(cx, cy, zAbs = 1){                 // centre a world point at a known zoom
+    cam.z = zAbs / fitZoom();
+    cam.x = cx - SW / 2; cam.y = cy - SH / 2;
+    stash(); applyCam();
+  },
+  focusDoc(id, z = 1){                      // centre one card at a known zoom
+    const d = findDoc(id); if (!d) return null;
+    cam.z = z / fitZoom();
+    cam.x = d.x + d.w / 2 - SW / 2;
+    cam.y = d.y + d.h / 2 - SH / 2;
+    stash(); applyCam();
+    return { z: cam.z * fitZoom() };
+  },
   get contentBounds(){ return contentBounds(); } };
 
 /* go: read the vault, then draw */

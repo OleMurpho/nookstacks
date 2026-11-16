@@ -1,0 +1,124 @@
+
+/* ---------------------------------------------------------- viewer chrome
+   Every richer card shares one frame: a thin tool strip, a scrolling well,
+   and the card body underneath. */
+.vbody{display:flex; flex-direction:column; height:100%}
+.vtools{display:flex; align-items:center; gap:5px; flex:none; padding:4px 8px;
+  border-bottom:1px solid var(--hair); font-family:ui-monospace,monospace; font-size:10.5px; color:var(--muted)}
+.vstat{margin-left:auto; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; opacity:.85}
+.vbtn{background:none; border:1px solid var(--hair); border-radius:5px; color:var(--ui-text);
+  font-family:ui-monospace,monospace; font-size:10.5px; padding:2px 7px; cursor:pointer; text-decoration:none}
+.vbtn:hover{color:var(--accent-bright); border-color:rgba(var(--amber-rgb),.45)}
+.vexpand{margin-left:6px; padding:2px 6px}
+.vwrap{flex:1; min-height:0; overflow:auto; overscroll-behavior:contain}
+.vload{padding:14px; font-family:ui-monospace,monospace; font-size:11px; color:var(--muted); line-height:1.6}
+.vload.bad{color:#f08fa6}
+.vtextarea{width:100%; height:100%; box-sizing:border-box; border:0; background:transparent; color:var(--ui-text);
+  font-family:ui-monospace,monospace; font-size:11.5px; line-height:1.55; padding:8px 10px; resize:none; outline:none}
+
+/* spreadsheets */
+.vtabs{display:flex; gap:4px; overflow-x:auto; scrollbar-width:none}
+.vtabs::-webkit-scrollbar{display:none}
+.vtab{background:none; border:1px solid var(--hair); border-radius:5px; color:var(--muted);
+  font-family:ui-monospace,monospace; font-size:10px; padding:2px 7px; cursor:pointer; white-space:nowrap}
+.vtab.on{color:var(--accent-bright); border-color:rgba(var(--amber-rgb),.5)}
+table.sheet{border-collapse:collapse; width:max-content; min-width:100%;
+  font-family:ui-monospace,monospace; font-size:11px; color:var(--ui-text)}
+table.sheet th, table.sheet td{border-right:1px solid var(--hair); border-bottom:1px solid var(--hair);
+  padding:2px 7px; white-space:nowrap; max-width:280px; overflow:hidden; text-overflow:ellipsis}
+table.sheet thead th{position:sticky; top:0; z-index:2; text-align:left; font-weight:600;
+  background:var(--bg2); color:var(--muted)}
+table.sheet td.rn, table.sheet th.rn{color:var(--muted); text-align:right; background:var(--bg2)}
+table.sheet td.num{text-align:right}
+.vmore{margin:6px 10px 12px; background:none; border:1px solid var(--hair); border-radius:5px;
+  color:var(--muted); font-family:ui-monospace,monospace; font-size:10.5px; padding:3px 8px; cursor:pointer}
+.vmore:hover{color:var(--accent-bright)}
+
+/* structured data */
+.tree{padding:7px 10px; font-family:ui-monospace,monospace; font-size:11.5px; line-height:1.55; color:var(--ui-text)}
+.tree ul{list-style:none; margin:0; padding-left:13px; border-left:1px solid var(--hair)}
+.tree summary{cursor:pointer; white-space:nowrap; outline:none}
+.tree summary:hover{color:var(--accent-bright)}
+.tree .tk{color:var(--ui-text)}
+.tree .tt{color:var(--muted); font-size:9.5px; margin-left:6px}
+.tv.string{color:#9ad7a0}
+.tv.number{color:#e2c37e}
+.tv.boolean{color:#8fb8f0}
+.tv.undefined, .tv.object{color:var(--muted)}
+
+/* fonts */
+.spec{padding:12px 14px; color:var(--ui-text)}
+.specbig{font-size:74px; line-height:1; margin-bottom:6px}
+.specrow{display:flex; gap:10px; align-items:baseline; border-top:1px solid var(--hair); padding:6px 0}
+.specsz{color:var(--muted); font-size:9px; width:18px; flex:none; font-family:ui-monospace,monospace}
+.specgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(19px,1fr)); gap:2px;
+  border-top:1px solid var(--hair); padding-top:7px; font-size:15px; text-align:center; opacity:.9}
+
+/* archives */
+.alist{display:flex; flex-direction:column}
+.arow{display:flex; gap:10px; justify-content:space-between; align-items:baseline; width:100%;
+  padding:4px 10px; background:none; border:0; border-bottom:1px solid var(--hair);
+  color:var(--ui-text); font-family:ui-monospace,monospace; font-size:11px; cursor:pointer; text-align:left}
+.arow:hover, .arow.on{background:rgba(var(--white-rgb),.055)}
+.an{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.as{color:var(--muted); flex:none}
+.aprev{border-top:1px solid var(--hair)}
+.aprevbar{display:flex; justify-content:space-between; align-items:center; gap:8px;
+  padding:4px 10px; font-family:ui-monospace,monospace; font-size:10.5px; color:var(--muted);
+  border-bottom:1px solid var(--hair)}
+.apre{margin:0; padding:8px 10px; font-family:ui-monospace,monospace; font-size:11px; line-height:1.5;
+  white-space:pre-wrap; color:var(--ui-text)}
+.apimg{max-width:100%; display:block; padding:8px; box-sizing:border-box}
+
+/* subtitles */
+.cues{font-family:ui-monospace,monospace; font-size:11.5px}
+.cue{display:flex; gap:9px; padding:4px 10px; border-bottom:1px solid var(--hair)}
+.ct{color:var(--accent-bright); flex:none; font-size:10px; padding-top:1px; opacity:.9}
+.cx{color:var(--ui-text); line-height:1.45}
+
+/* calendar and contacts */
+.crow{display:flex; gap:10px; padding:7px 10px; border-bottom:1px solid var(--hair)}
+.cwhen{color:var(--accent-bright); font-family:ui-monospace,monospace; font-size:10px; width:92px; flex:none; padding-top:2px}
+.cbody b{display:block; font-size:12px; color:var(--ui-text)}
+.cwhere{color:var(--muted); font-size:10.5px}
+.vrow{padding:8px 10px; border-bottom:1px solid var(--hair)}
+.vname{font-size:12.5px; color:var(--ui-text)}
+.vsub, .vmeta{color:var(--muted); font-size:10.5px; line-height:1.6}
+
+/* ebooks */
+.book{padding:10px 16px 16px; font-size:12.5px; line-height:1.6; color:var(--ui-text)}
+.book h1, .book h2, .book h3, .book h4{font-size:14px; margin:14px 0 6px; color:var(--ui-text)}
+.book p{margin:0 0 8px}
+.book img{max-width:100%}
+.book hr{border:0; border-top:1px solid var(--hair); margin:14px 0}
+.book a{color:var(--accent-bright)}
+
+/* drawings, maps, midi */
+svg.cad, svg.geo{display:block; width:100%; height:100%; padding:8px; box-sizing:border-box}
+svg.cad{stroke:var(--accent-bright); stroke-width:.7; fill:none; opacity:.9}
+svg.cad .cl{stroke-width:1}
+svg.cad text{fill:var(--ui-text); stroke:none; opacity:.75}
+svg.geo polyline{fill:none; stroke:var(--accent-bright); stroke-width:1.5; vector-effect:non-scaling-stroke}
+svg.geo polygon{fill:rgba(var(--amber-rgb),.16); stroke:var(--accent-bright); stroke-width:1; vector-effect:non-scaling-stroke}
+svg.geo circle{fill:var(--accent-bright)}
+.midiwrap{height:100%; padding:8px; box-sizing:border-box}
+svg.midi{display:block; width:100%; height:100%; fill:var(--accent-bright); background:rgba(var(--white-rgb),.025)}
+svg.midi .ph{stroke:#fff; stroke-width:1; opacity:.45}
+
+/* notebooks */
+.nbm{padding:8px 12px; font-size:12px; line-height:1.55; color:var(--ui-text)}
+.nbm h1, .nbm h2, .nbm h3, .nbm h4{font-size:13px; margin:8px 0 4px}
+.nbm p{margin:0 0 6px}
+.nbm ul{margin:0 0 6px; padding-left:18px}
+pre.nbcode{margin:0; padding:8px 12px; background:rgba(var(--white-rgb),.045);
+  border-left:2px solid rgba(var(--amber-rgb),.45); font-family:ui-monospace,monospace;
+  font-size:11px; line-height:1.5; white-space:pre-wrap; color:#dfe7f2}
+pre.nbout{margin:0; padding:6px 12px; font-family:ui-monospace,monospace; font-size:10.5px;
+  line-height:1.45; white-space:pre-wrap; color:var(--muted); border-bottom:1px solid var(--hair)}
+pre.nbout.bad{color:#f08fa6}
+.nbimg{max-width:100%; display:block; padding:6px 12px; box-sizing:border-box}
+.nbhtml{padding:4px 12px; font-size:11.5px; color:var(--ui-text); overflow:auto}
+
+/* mermaid */
+.diagram{padding:8px; display:flex; justify-content:center; min-height:100%; box-sizing:border-box}
+.diagram svg{max-width:100%; height:auto}
