@@ -1,10 +1,10 @@
 # Nookstacks
 
-A quiet place to put everything you're building.
+Your noggin, your nook. Organization your way. 
 
 Categories stack into projects, projects open onto an infinite board, and the board
-holds whatever the work actually is — notes, documents, drawings, PDFs, 3D models,
-audio, links, and the coloured regions that group them.
+holds whatever you want! Notes, documents, drawings, PDFs, 3D models,
+audio, links, and many more!
 
 ## Try it first
 
