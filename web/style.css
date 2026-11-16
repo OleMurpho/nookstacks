@@ -462,10 +462,11 @@ body.drawmode #stage *{cursor:crosshair}
 .themes{grid-template-columns:1fr 1fr; max-height:340px; overflow-y:auto; padding-right:2px}
 
 /* regions are objects you can grab, select and colour */
+/* the frame is paint only: it sits under the cards and never takes a press, so
+   everything inside a region stays clickable. The tab is the handle. */
 .group{border-color:rgba(var(--rg-rgb, var(--amber-rgb)),.40);
   background:rgba(var(--rg-rgb, var(--amber-rgb)),.035);
-  pointer-events:auto; cursor:grab}
-.group:active{cursor:grabbing}
+  pointer-events:none; z-index:0}
 .group .grouphead{color:var(--rg, var(--accent-bright))}
 .group .gdel{border-color:rgba(var(--rg-rgb, var(--amber-rgb)),.35)}
 .group .gdel:hover{color:var(--rg, var(--gdel-hover)); border-color:var(--rg, var(--amber))}

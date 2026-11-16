@@ -771,62 +771,35 @@ function wireGroups(panelEl, shelf){
     if (!g) return;
     const label = el.querySelector('.grouphead');
 
-    // the frame itself is grabbable: drag anywhere inside a region to move it,
-    // together with anything else that is selected
-    const grab = (e) => {
+    // a region moves by its tab, and only by its tab
+    label.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
-      if (e.target.closest('.grouphead, .gh, .gdel')) return;
-      if (e.altKey) return;                  // Alt-drag inside a region draws a selection box instead
-      if (e.ctrlKey || e.metaKey){
-        e.preventDefault(); e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
+      if (e.ctrlKey || e.metaKey){              // add or drop one region
         if (gsel.has(g.id)) gsel.delete(g.id); else gsel.add(g.id);
         paintSelection();
         return;
       }
-      if (!gsel.has(g.id)){
-        sel = new Set(); gsel = new Set([g.id]); selected = null;
-      }
-      paintSelection();
-      e.preventDefault(); e.stopPropagation();
+      if (e.shiftKey){ gsel.add(g.id); paintSelection(); return; }
+      if (!gsel.has(g.id)){ sel = new Set(); gsel = new Set([g.id]); selected = null; paintSelection(); }
 
       const z = cam.z * fitZoom();
       const sx = e.clientX, sy = e.clientY;
-      const groups = curShelf().groups.filter(x => gsel.has(x.id)).map(x => ({ o: x, x: x.x, y: x.y }));
-      const cards = curShelf().docs.filter(d => sel.has(d.id)).map(d => ({ o: d, x: d.x, y: d.y }));
+      // the tab drags the whole selection: every selected region and every selected card
+      const groups = curShelf().groups.filter(x => gsel.has(x.id)).map(x => ({ o: x, x: x.x, y: x.y, el: document.querySelector(`.group[data-gid="${x.id}"]`) }));
+      const cards = curShelf().docs.filter(d => sel.has(d.id)).map(d => ({ o: d, x: d.x, y: d.y, el: document.querySelector(`.obj[data-id="${d.id}"]`) }));
       const move = ev => {
         const dx = (ev.clientX - sx) / z, dy = (ev.clientY - sy) / z;
         groups.forEach(it => {
           it.o.x = it.x + dx; it.o.y = it.y + dy;
-          const el2 = document.querySelector(`.group[data-gid="${it.o.id}"]`);
-          if (el2){ el2.style.left = it.o.x + 'px'; el2.style.top = it.o.y + 'px'; }
+          if (it.el){ it.el.style.left = it.o.x + 'px'; it.el.style.top = it.o.y + 'px'; }
         });
         cards.forEach(it => {
           it.o.x = it.x + dx; it.o.y = it.y + dy;
-          const el2 = document.querySelector(`.obj[data-id="${it.o.id}"]`);
-          if (el2){ el2.style.left = it.o.x + 'px'; el2.style.top = it.o.y + 'px'; }
+          if (it.el){ it.el.style.left = it.o.x + 'px'; it.el.style.top = it.o.y + 'px'; }
         });
       };
-      const up = () => {
-        window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up);
-        save(); render();
-      };
-      window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
-    };
-    el.addEventListener('mousedown', grab);
-
-    // move by the label
-    label.addEventListener('mousedown', e => {
-      if (e.button !== 0) return;
-      e.preventDefault(); e.stopPropagation();
-      if (!gsel.has(g.id)){ sel = new Set(); gsel = new Set([g.id]); selected = null; paintSelection(); }
-      const z = cam.z * fitZoom();
-      const sx = e.clientX, sy = e.clientY, ox = g.x, oy = g.y;
-      const move = ev => {
-        g.x = ox + (ev.clientX - sx) / z;
-        g.y = oy + (ev.clientY - sy) / z;
-        el.style.left = g.x + 'px'; el.style.top = g.y + 'px';
-      };
-      const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); save(); };
+      const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); save(); render(); };
       window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
     });
 
@@ -1536,7 +1509,7 @@ const PAN = { moved: 0 };        // how far the last right-drag travelled: a pan
     // left button over bare canvas draws a selection box; over a card the card
     // owns the press (select / drag / edit). Alt forces the box even inside a
     // region, so a board full of regions can still be swept in one gesture.
-    if (overElement && !(e.altKey && !e.target.closest('.obj'))) return;
+    if (overElement) return;
     startMarquee(e);
   });
 

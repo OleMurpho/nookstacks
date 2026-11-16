@@ -56,8 +56,8 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 | `Esc` | close the settings panel, cancel a region, deselect |
 | double-click a note | edit it, click away to save |
 | click + drag on empty board | draw a selection box; everything it touches is selected |
-| `Alt` + drag inside a region | draw a selection box instead of grabbing the region |
-| click + drag inside a region | grab and move that region (selection included) |
+| drag a region's tab | move that region, and anything else selected with it |
+| `Ctrl` + click a region tab | add the region to the selection |
 | `Ctrl`/`⌘` + click a card | add it to the selection, click again to drop it |
 | `Shift` + click a card | add it to the selection without toggling |
 | `Ctrl+A` | select every card on the board |
@@ -67,7 +67,9 @@ Saves are atomic — written to a temp file, fsynced, then renamed — so an int
 
 ### Regions
 
-A region is an object, not a backdrop: click anywhere inside one and it is selected, drag anywhere inside it and the whole region moves — together with every other region and card that is selected. Grab it by the label too, resize it from the corner handles, rename it by double-clicking the label (or from its right-click menu), and delete it with the ✕ or `Delete`, which removes the region and leaves the cards inside it alone.
+A region is a frame drawn **behind** its contents and it never takes a click, so every card inside one stays fully usable — you can select, drag, edit, right-click and open things inside a region exactly as if it were not there.
+
+The **tab is the handle**: click it to select the region, drag it to move the region (bringing every other selected region and card with it), `Ctrl`-click several tabs to select them together, double-click the tab to rename it, or right-click it for the region menu. The corner handles resize it, and the ✕ or `Delete` removes the selected regions while leaving the cards inside them alone.
 
 Each region carries its own colour. Right-click → **Colour** opens eight swatches — amber, sky, mint, rose, violet, lime, orange, slate — and applies the choice to every selected region at once. The colour is stored with the region, so it survives a restart and travels inside an exported `.nks` board.
 
