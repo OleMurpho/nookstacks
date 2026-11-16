@@ -9,8 +9,10 @@ audio, links, and the coloured regions that group them.
 ## Try it first
 
 **[nookstacks.io](https://nookstacks.io)** — the whole app in a browser tab, no install.
-It opens on a demo board (Example Category 1 → Example Project 1) with one of every
-kind of card, and whatever you do there is kept in your own browser, never uploaded.
+A new board starts empty. If you want something to look at, *File → Add a template* drops
+in one of three ready-made boards — a guided tour, one card of every kind of file, or a
+media set — beside your own cards or as a new project. Whatever you do is kept in your
+own browser, never uploaded.
 
 ![The board](docs/screenshot.png)
 
@@ -23,6 +25,17 @@ kind of card, and whatever you do there is kept in your own browser, never uploa
 - **A file, not a service** — one folder of JSON and blobs, autosaved, 40 rolling backups, 80 steps of undo. No account, no sync, no network.
 - **Boards travel** — *File → Export* writes a `.nks` bundle: the board, its regions and every file on it, in one zip. *Open board* reads it back. The desktop app asks where to save; the browser downloads it.
 - **Fits the screen you have** — a collapsible rail on desktop and tablet (`Ctrl+B`, or the thin bar it leaves behind), and on a phone the rail becomes a drawer, one finger pans, two pinch, and a long press opens the menu.
+
+## Starting empty, with templates
+
+Nothing is created for you. The first board is blank, with one empty project and a card
+that offers the two things you actually want: a template, or your own files.
+
+Three templates ship with the app, and they only ever *add* — your cards stay where they are:
+
+- **Start here** — six notes: dragging, regions, shortcuts, where files live.
+- **Everything it opens** — one card of every file type the app can read (18 cards).
+- **Media and models** — a picture, a clip, a sound, a PDF and a model you can orbit.
 
 ## What it opens
 

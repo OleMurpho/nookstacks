@@ -30,6 +30,7 @@
 
 <link rel="stylesheet" href="style.css?v=7">
 <link rel="stylesheet" href="viewers.css?v=2">
+<link rel="stylesheet" href="templates.css?v=3">
 <link rel="stylesheet" href="themes.css?v=2">
 <script type="importmap">
 { "imports": {
@@ -87,8 +88,24 @@
   <button id="navPrev" class="navarrow left" hidden title="Previous project">‹</button>
   <button id="navNext" class="navarrow right" hidden title="Next project">›</button>
   <div id="empty" hidden>
-    <p>Nothing on this shelf yet.</p>
-    <p class="sub">Import a file, drop one onto the board, or press <b>N</b> to write.</p>
+    <div class="emptycard">
+      <h3>An empty board</h3>
+      <p class="sub" id="emptyHint">Press <b>N</b> to write, drag a file in, or start from a template.</p>
+      <div class="emptyacts">
+        <button class="ghostbtn primary" id="emptyTemplate">Start from a template</button>
+        <button class="ghostbtn" id="emptyImport">Import files</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="templates" hidden>
+    <div class="scrim" data-close></div>
+    <section class="drawer tplwrap" role="dialog" aria-label="Templates">
+      <header><h2>Templates</h2><button class="setx" data-close title="Close (Esc)">✕</button></header>
+      <p class="tpllede">Every board starts empty. A template drops a finished set of cards onto this
+        one — add it beside what you have, or open it as its own project. Nothing is locked.</p>
+      <div class="tplgrid" id="tplGrid"></div>
+    </section>
   </div>
 
   <div id="settings" hidden>
@@ -141,6 +158,6 @@
 <script src="viewers-data.js?v=1"></script>
 <script src="viewers-media.js?v=1"></script>
 <script src="viewers-doc.js?v=1"></script>
-<script type="module" src="app.js?v=16"></script>
+<script type="module" src="app.js?v=21"></script>
 </body>
 </html>

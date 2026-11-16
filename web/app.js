@@ -277,88 +277,147 @@ const localVault = {
 };
 
 /* ---------------------------------------------------------------- seed */
+/* A new board starts empty. What used to be the demo is now a set of templates
+   you can drop in on purpose: guided notes, one of every kind of file, and the
+   media row. Nobody meets seventeen file types on their first click. */
+const newId = pre => pre + Math.random().toString(36).slice(2, 9);
+const tplDoc = (kind, title, x, y, w, h, extra = {}) => ({ id: newId('o'), kind, title, x, y, w, h, ...extra });
+const tplFile = (kind, title, file, ext, x, y, w, h, extra = {}) =>
+  tplDoc(kind, title, x, y, w, h, { ...(file ? { src: 'demo/' + file } : {}), ext, size: 0, ...extra });
+const tplRegion = (name, x, y, w, h, color) => ({ id: newId('g'), name, x, y, w, h, color });
+
+/* a phone has no keyboard: the empty board should not say "press N" */
+function emptyCopy(){
+  const hint = document.getElementById('emptyHint');
+  if (!hint) return;
+  hint.innerHTML = isPhone()
+    ? 'Start from a template, or bring your own files.'
+    : 'Press <b>N</b> for a note, drop a file in, or start from a template.';
+}
+
 function seed(){
-  const mk = (kind, title, x, y, w, h, extra = {}) => ({ id: 'o' + Math.random().toString(36).slice(2, 9), kind, title, x, y, w, h, ...extra });
-  const demo = (kind, title, file, ext, x, y, w, h, extra = {}) =>
-    mk(kind, title, x, y, w, h, { ...(file ? { src: 'demo/' + file } : {}), ext, size: 0, ...extra });
+  return { levels: [
+    { id: 'c1', name: 'Category 1', shelves: [
+      { id: 's1', name: 'Project 1', pan: { x: 0, y: 0, z: 1 }, docs: [], groups: [] }
+    ] }
+  ] };
+}
 
-  return { demo: true, demoVersion: DEMO_VERSION, levels: [
-    { id:'ex1', name:'Example Category 1', shelves:[
-      { id:'ex1s1', name:'Example Project 1', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g1', name:'START HERE', x:40, y:40, w:790, h:620, color:'amber' },
-          { id:'g2', name:'DOCUMENTS', x:860, y:40, w:980, h:620, color:'sky' },
-          { id:'g3', name:'MEDIA', x:40, y:700, w:1100, h:620, color:'violet' },
-          { id:'g4', name:'ODDS AND ENDS', x:1170, y:700, w:670, h:620, color:'mint' } ],
-        docs:[
-          /* --- the tutorial, as ordinary notes on the board --- */
-          mk('note','1 · This is a demo', 80, 90, 340, 200, { text:'<p>Everything here is an example. Rename it, drag it, delete it — nothing on this board is precious.</p>' }),
-          mk('note','2 · Drag a card by its tab', 440, 90, 360, 200, { text:'<p>Grab the strip at the top of a card. The body stays put so you can click and edit inside it.</p><p>On a phone: one finger moves the board, two pinch to zoom.</p>' }),
-          mk('note','3 · Regions group things', 80, 330, 340, 300, { text:'<p>A region is a coloured frame around part of a board — like these four. Drag its tab to move it; the contents do not follow unless you select them too.</p><p>Right-click a region tab — long-press on a touch screen — for its colour, or to fit the board to it.</p>' }),
-          mk('note','4 · Your board is a file', 440, 330, 360, 300, { text:'<p>Notes, documents and every attached file live in one vault folder. Nothing leaves the machine.</p><p>Press <b>S</b> for settings and themes, <b>?</b> for every shortcut.</p>' }),
+const TEMPLATES = [
+  {
+    id: 'start', name: 'Start here', tint: 'amber',
+    blurb: 'Six notes that explain the board: dragging, regions, the shortcuts, and where your files live.',
+    build(){
+      return {
+        groups: [
+          tplRegion('START HERE', 40, 40, 790, 620, 'amber'),
+          tplRegion('THE REST', 860, 40, 640, 620, 'sky')
+        ],
+        docs: [
+          tplDoc('note', '1 · This is a board', 80, 90, 340, 200,
+            { text: '<p>Cards sit on an infinite board. Everything here is yours to rename, drag or delete.</p>' }),
+          tplDoc('note', '2 · Drag a card by its tab', 440, 90, 360, 200,
+            { text: '<p>Grab the strip at the top of a card. The body stays put so you can click and edit inside it.</p><p>On a phone: one finger moves the board, two pinch to zoom.</p>' }),
+          tplDoc('note', '3 · Regions group things', 80, 330, 340, 300,
+            { text: '<p>A region is a coloured frame around part of a board — like these two. Drag its tab to move it; the contents do not follow unless you select them too.</p><p>Right-click a region tab — long-press on a touch screen — for its colour, or to fit the board to it.</p>' }),
+          tplDoc('note', '4 · Your board is a file', 440, 330, 360, 300,
+            { text: '<p>Notes and every attached file live in one vault folder. Nothing leaves the machine.</p><p>Press <b>S</b> for settings and themes, <b>?</b> for every shortcut.</p>' }),
+          tplDoc('note', 'Press N to write', 900, 90, 300, 180,
+            { text: '<p><b>N</b> note · <b>T</b> document · <b>G</b> region · <b>F</b> fit · <b>?</b> shortcuts.</p>' }),
+          tplDoc('note', 'Add your own files', 900, 300, 300, 200,
+            { text: '<p>Drag a file onto the board, or use <b>File → Import files</b>. A card opens with the viewer that file deserves.</p>' })
+        ]
+      };
+    }
+  },
+  {
+    id: 'zoo', name: 'Everything it opens', tint: 'sky',
+    blurb: 'One card of every kind the app can read: sheets, a notebook, a data tree, a font, an archive, a book, a drawing, a piano roll, a mesh, a diagram, a map.',
+    build(){
+      return {
+        groups: [
+          tplRegion('SHEETS AND DATA', 20, 60, 1240, 1000, 'amber'),
+          tplRegion('DOCUMENTS AND DIAGRAMS', 1220, 60, 1040, 1000, 'sky'),
+          tplRegion('DRAWINGS AND SOUND', 20, 1080, 2220, 600, 'violet'),
+          tplRegion('FILES AND LISTS', 20, 1620, 2220, 940, 'mint')
+        ],
+        docs: [
+          tplDoc('note', 'Every kind of file', 60, 2180, 560, 200,
+            { text: '<p>The same board, opened with a viewer for each kind: a sheet grid, a notebook, a tree, a font specimen, an archive listing, subtitles, a calendar, contacts, a book, a drawing, a piano roll, a mesh, a diagram and a map.</p><p>Anything without a viewer keeps the plain file tile and a download link.</p>' }),
 
-          /* --- one of everything --- */
-          demo('text','notes.md','notes.md','md', 900, 90, 320, 240),
-          demo('text','hello.py','hello.py','py', 1240, 90, 300, 240),
-          demo('text','data.csv','data.csv','csv', 1560, 90, 250, 240),
-          demo('pdf','example-sheet.pdf','example-sheet.pdf','pdf', 900, 370, 430, 260),
-          demo('image','board-render.png','board-render.png','png', 1360, 370, 440, 260),
+          tplFile('sheet', 'inventory.xlsx', 'inventory.xlsx', 'xlsx', 60, 100, 560, 440),
+          tplFile('sheet', 'parts.csv', 'parts.csv', 'csv', 660, 100, 560, 440),
+          tplFile('notebook', 'ring-buffer.ipynb', 'ring-buffer.ipynb', 'ipynb', 60, 600, 560, 460),
+          tplFile('data', 'config.json', 'config.json', 'json', 660, 600, 560, 460),
 
-          demo('video','example-clip.mp4','example-clip.mp4','mp4', 80, 750, 500, 330),
-          demo('audio','example-tone.mp3','example-tone.mp3','mp3', 620, 750, 480, 160),
-          demo('model','rogue.obj','rogue.obj','obj', 620, 950, 480, 320),
+          tplFile('font', 'example-font.ttf', 'example-font.ttf', 'ttf', 1260, 100, 460, 440),
+          tplFile('diagram', 'flow.mmd', 'flow.mmd', 'mmd', 1760, 100, 460, 440),
+          tplFile('data', 'settings.yaml', 'settings.yaml', 'yaml', 1260, 600, 460, 460),
+          tplFile('data', 'pyproject.toml', 'pyproject.toml', 'toml', 1760, 600, 460, 460),
 
-          demo('link','example.com','','', 1210, 750, 590, 300, { url:'https://example.com' }),
-          demo('file','example.zip','example.zip','zip', 1210, 1090, 320, 170, { size: 177 })
-        ] },
-      { id:'ex1s2', name:'Example Project 2', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g5', name:'SHEETS AND DATA', x:20, y:60, w:1240, h:1000, color:'amber' },
-          { id:'g8', name:'DOCUMENTS AND DIAGRAMS', x:1220, y:60, w:1040, h:1000, color:'sky' },
-          { id:'g9', name:'DRAWINGS AND SOUND', x:20, y:1080, w:2220, h:600, color:'violet' },
-          { id:'g10', name:'FILES AND LISTS', x:20, y:1620, w:2220, h:940, color:'mint' } ],
-        docs:[
-          mk('note','Every other kind of file', 60, 2180, 560, 200, { text:'<p>The same board, opened with a viewer for each kind: a sheet grid, a notebook, a tree, a font specimen, an archive listing, subtitles, a calendar, contacts, a book, a drawing, a piano roll, a mesh, a diagram and a map.</p><p>Anything without a viewer keeps the plain file tile and a download link.</p>' }),
+          tplFile('cad', 'bracket.dxf', 'bracket.dxf', 'dxf', 60, 1120, 560, 480),
+          tplFile('mesh3mf', 'cube.3mf', 'cube.3mf', '3mf', 660, 1120, 560, 480),
+          tplFile('ebook', 'field-notes.epub', 'field-notes.epub', 'epub', 1260, 1120, 460, 520),
+          tplFile('midi', 'scale.mid', 'scale.mid', 'mid', 1760, 1120, 460, 400),
 
-          demo('sheet','inventory.xlsx','inventory.xlsx','xlsx', 60, 100, 560, 440),
-          demo('sheet','parts.csv','parts.csv','csv', 660, 100, 560, 440),
-          demo('notebook','ring-buffer.ipynb','ring-buffer.ipynb','ipynb', 60, 600, 560, 460),
-          demo('data','config.json','config.json','json', 660, 600, 560, 460),
+          tplFile('archive', 'bundle.zip', 'bundle.zip', 'zip', 60, 1660, 560, 460),
+          tplFile('subtitle', 'clip.srt', 'clip.srt', 'srt', 660, 1660, 560, 420),
+          tplFile('calendar', 'schedule.ics', 'schedule.ics', 'ics', 1260, 1660, 460, 420),
+          tplFile('contact', 'team.vcf', 'team.vcf', 'vcf', 1760, 1660, 460, 360),
+          tplFile('geo', 'site.geojson', 'site.geojson', 'geojson', 60, 2410, 560, 460)
+        ]
+      };
+    }
+  },
+  {
+    id: 'media', name: 'Media and models', tint: 'violet',
+    blurb: 'A picture, a clip, a sound, a PDF and a 3D model — the cards that play, orbit and zoom.',
+    build(){
+      return {
+        groups: [ tplRegion('MEDIA', 40, 40, 1500, 800, 'violet') ],
+        docs: [
+          tplFile('image', 'board-render.png', 'board-render.png', 'png', 80, 100, 440, 260),
+          tplFile('video', 'example-clip.mp4', 'example-clip.mp4', 'mp4', 560, 100, 500, 330),
+          tplFile('pdf', 'example-sheet.pdf', 'example-sheet.pdf', 'pdf', 1100, 100, 420, 520),
+          tplFile('audio', 'example-tone.mp3', 'example-tone.mp3', 'mp3', 80, 400, 460, 160),
+          tplFile('model', 'rogue.obj', 'rogue.obj', 'obj', 560, 470, 500, 330)
+        ]
+      };
+    }
+  }
+];
+TEMPLATES.forEach(t => { const b = t.build(); t.cards = b.docs.length; t.groups = b.groups.length; });
 
-          demo('font','example-font.ttf','example-font.ttf','ttf', 1260, 100, 460, 440),
-          demo('diagram','flow.mmd','flow.mmd','mmd', 1760, 100, 460, 440),
-          demo('data','settings.yaml','settings.yaml','yaml', 1260, 600, 460, 460),
-          demo('data','pyproject.toml','pyproject.toml','toml', 1760, 600, 460, 460),
+/* ------------------------------------------------------------- templates */
+function boardRightEdge(){
+  let x1 = null;
+  const sh = curShelf();
+  const bump = (x, w) => { x1 = x1 === null ? x + w : Math.max(x1, x + w); };
+  sh.docs.forEach(d => bump(d.x, d.w));
+  sh.groups.forEach(g => bump(g.x, g.w));
+  return x1;
+}
 
-          demo('cad','bracket.dxf','bracket.dxf','dxf', 60, 1120, 560, 480),
-          demo('mesh3mf','cube.3mf','cube.3mf','3mf', 660, 1120, 560, 480),
-          demo('ebook','field-notes.epub','field-notes.epub','epub', 1260, 1120, 460, 520),
-          demo('midi','scale.mid','scale.mid','mid', 1760, 1120, 460, 400),
-
-          demo('archive','bundle.zip','bundle.zip','zip', 60, 1660, 560, 460),
-          demo('subtitle','clip.srt','clip.srt','srt', 660, 1660, 560, 420),
-          demo('calendar','schedule.ics','schedule.ics','ics', 1260, 1660, 460, 420),
-          demo('contact','team.vcf','team.vcf','vcf', 1760, 1660, 460, 360),
-          demo('geo','site.geojson','site.geojson','geojson', 60, 2410, 560, 460)
-        ] },
-      { id:'ex1s3', name:'Example Project 3', pan:{x:0,y:0,z:1}, groups:[],
-        docs:[ mk('note','An empty-ish board', 120, 120, 340, 180, { text:'<p>Press <b>N</b> for a note, <b>T</b> for a document, <b>G</b> to draw a region.</p>' }) ] }
-    ]},
-    { id:'ex2', name:'Example Category 2', shelves:[
-      { id:'ex2s1', name:'Example Project 4', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g6', name:'THEMES', x:60, y:60, w:760, h:460, color:'violet' } ],
-        docs:[
-          mk('note','Sixteen themes, or build your own', 100, 110, 380, 260, { text:'<p>Press <b>S</b>. Every surface is drawn from one set of colour tokens, so a theme is a palette swap.</p><p>Custom lets you pick five colours and derives the rest.</p>' }),
-          mk('note','Text size, grid, motion', 520, 110, 270, 260, { text:'<p>Same panel. Reduce motion also honours your system setting.</p>' })
-        ] }
-    ]},
-    { id:'ex3', name:'Example Category 3', shelves:[
-      { id:'ex3s1', name:'Example Project 5', pan:{x:0,y:0,z:1}, groups:[
-          { id:'g7', name:'BOARDS AS FILES', x:60, y:60, w:820, h:520, color:'mint' } ],
-        docs:[
-          mk('note','.nks bundles', 100, 110, 380, 300, { text:'<p>File → Export this board writes a <b>.nks</b> file: the board, its cards and every attached file, in one zip.</p><p>Open board reads one back. It is how you move a project between machines.</p>' }),
-          mk('note','Portable by design', 520, 110, 320, 300, { text:'<p>Paths never appear in the bundle — files are addressed by content hash, so a board exported on Windows opens on Linux.</p>' })
-        ] }
-    ]}
-  ]};
+function addTemplate(id, asProject = false){
+  const t = TEMPLATES.find(x => x.id === id);
+  if (!t) return null;
+  let sh;
+  if (asProject){
+    sh = { id: newId('s'), name: t.name, pan: { x: 0, y: 0, z: 1 }, docs: [], groups: [] };
+    curLevel().shelves.push(sh);
+    shelf = curLevel().shelves.length - 1;
+  } else {
+    sh = curShelf();
+  }
+  const built = t.build();
+  const edge = asProject ? null : boardRightEdge();
+  const dx = edge === null ? 0 : Math.round(edge + 160);   // land beside what is there
+  built.docs.forEach(d => { d.x += dx; sh.docs.push(d); });
+  built.groups.forEach(g => { g.x += dx; sh.groups.push(g); });
+  closeTemplates();
+  save(); render(); fitView();
+  note('template', t.name);
+  return sh;
 }
 
 /* ---------------------------------------------------------------- vault
@@ -475,7 +534,6 @@ const vault = {
   }
 };
 
-const DEMO_VERSION = 4;
 let db = seed();
 
 /* ---------------------------------------------------------------- settings */
@@ -648,6 +706,28 @@ function wireCustomEditor(){
 function setSetting(key, value){ settings()[key] = value; applySettings(); save(); }
 const settingsOpen = () => !document.getElementById('settings').hidden;
 function openSettings(){ document.getElementById('settings').hidden = false; paintSettings(); }
+function openTemplates(){ document.getElementById('templates').hidden = false; paintTemplates(); }
+function closeTemplates(){ document.getElementById('templates').hidden = true; }
+
+function paintTemplates(){
+  const grid = document.getElementById('tplGrid');
+  if (!grid) return;
+  grid.innerHTML = TEMPLATES.map(t => `
+    <article class="tplcard">
+      <span class="tplbar t-${t.tint}"></span>
+      <div class="tpltext">
+        <h3>${esc(t.name)}</h3>
+        <p>${esc(t.blurb)}</p>
+        <div class="tplmeta">${t.cards} card${t.cards === 1 ? '' : 's'}${t.groups ? ` · ${t.groups} region${t.groups === 1 ? '' : 's'}` : ''}</div>
+      </div>
+      <div class="tplacts">
+        <button class="tpladd" data-t="${t.id}">Add to this board</button>
+        <button class="tplnew linkbtn" data-t="${t.id}">As a new project</button>
+      </div>
+    </article>`).join('');
+  grid.querySelectorAll('.tpladd').forEach(b => b.onclick = () => addTemplate(b.dataset.t, false));
+  grid.querySelectorAll('.tplnew').forEach(b => b.onclick = () => addTemplate(b.dataset.t, true));
+}
 function closeSettings(){ document.getElementById('settings').hidden = true; }
 
 // paint before boot so a saved theme is on screen from the first frame
@@ -710,9 +790,9 @@ async function boot(){
   // measuring, and a way out of a board that will not load.
   const fresh = /[?&]fresh=1/.test(location.search);
   if (fresh){
-    db = { levels: [{ name: 'Level 1', shelves: [{ name: 'Board 1', docs: [], groups: [] }] }],
-           settings: { ...DEFAULT_SETTINGS } };
+    db = Object.assign(seed(), { settings: { ...DEFAULT_SETTINGS } });
     window.__scratch = true;
+    emptyCopy();
     applySettings(); bootRail(); wireRailToggle(); render();
     window.__bootMs = Math.round(performance.now() - __t0);
     setSaveState('scratch board', 'ok');
@@ -730,12 +810,9 @@ async function boot(){
       const res = await vault.getState();
       if (res && res.state && res.state.levels && res.state.levels.length){
         db = res.state;
-        // a stored board that is an older copy of the demo is nobody's work:
-        // move it forward instead of leaving last month's example on screen
-        if (db.demo && (db.demoVersion || 0) < DEMO_VERSION){
-          db = seed();
-          dirtyAfterBoot = true;
-        }
+        // Boards are no longer replaced on upgrade. A stored board is the
+        // user's, even if it started life as the demo — templates replace the
+        // old "overwrite the example" migration.
         setSaveState((vault.kind === 'local' ? 'this browser · ' : 'vault · ') +
           (res.saved ? new Date(res.saved).toLocaleString() : 'loaded'), 'ok');
         if (DESKTOP && vault.path) document.getElementById('saveState').title = vault.path;
@@ -755,6 +832,7 @@ async function boot(){
   storeReady = true;
   // a fresh vault should record its defaults, not just imply them
   if (!db.settings){ db.settings = { ...DEFAULT_SETTINGS }; dirtyAfterBoot = true; }
+  emptyCopy();
   applySettings();
   bootRail();
   wireRailToggle();
@@ -1804,7 +1882,8 @@ function toggleDraw(on){
 addEventListener('keydown', e => {
   const typing = e.target.isContentEditable || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT';
   if (e.key === 'Escape'){
-    if (settingsOpen()){ closeSettings(); return; }
+    if (!$('#templates').hidden){ closeTemplates(); return; }
+    if (!$('#settings').hidden){ closeSettings(); return; }
     if (drawMode) toggleDraw(false);
     if (typing) e.target.blur();
     select(null); return;
@@ -1880,6 +1959,9 @@ buildThemes();
 wireCustomEditor();
 document.getElementById('openSettings').onclick = openSettings;
 document.querySelectorAll('#settings [data-close]').forEach(el => el.onclick = closeSettings);
+document.querySelectorAll('#templates [data-close]').forEach(el => el.onclick = closeTemplates);
+{ const b = document.getElementById('emptyTemplate'); if (b) b.onclick = openTemplates; }
+{ const b = document.getElementById('emptyImport'); if (b) b.onclick = () => $('#fileinput').click(); }
 document.querySelectorAll('#settings .seg').forEach(seg =>
   seg.querySelectorAll('button').forEach(b => b.onclick = () => setSetting(seg.dataset.set, b.dataset.v)));
 document.getElementById('settingsReset').onclick = () => { db.settings = { ...DEFAULT_SETTINGS }; applySettings(); save(); };
@@ -3075,6 +3157,7 @@ const MENUS = [
     { sep: true },
     { label: 'Import files…', key: 'I', run: () => DESKTOP ? desktopImport() : $('#fileinput').click() },
     { label: 'Place from URL…', run: () => addUrl() },
+    { label: 'Add a template…', run: () => openTemplates() },
     { sep: true },
     { label: 'Open board…', key: 'Ctrl+O', run: () => importNks() },
     { label: 'Export this board…', key: 'Ctrl+Shift+E', run: () => exportNks('board') },
