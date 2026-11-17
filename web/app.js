@@ -873,7 +873,27 @@ function save(){
   }, 400);
 }
 
+/* A dev build installs beside the real one and shares its look. Say which is
+   which, so a half-finished change is never mistaken for the shipped app. */
+async function markFlavour(){
+  if (!DESKTOP) return;
+  try {
+    const f = await call('build_flavour');
+    if (f !== 'dev') return;
+    document.body.classList.add('is-dev');
+    const host = document.querySelector('#saveState');
+    if (host && !document.querySelector('.devpill')){
+      const pill = document.createElement('span');
+      pill.className = 'devpill';
+      pill.textContent = 'DEV';
+      pill.title = 'Development build — its own data, separate from the release app';
+      host.parentNode.insertBefore(pill, host);
+    }
+  } catch {}
+}
+
 async function boot(){
+  markFlavour();
   // ?fresh=1 opens an empty board and leaves storage alone: a clean slate for
   // measuring, and a way out of a board that will not load.
   const fresh = /[?&]fresh=1/.test(location.search);

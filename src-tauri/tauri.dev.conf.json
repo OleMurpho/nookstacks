@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Nookstacks Dev",
+  "identifier": "io.github.olemurpho.nookstacks.dev",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Nookstacks Dev",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "theme": "Dark",
+        "backgroundColor": "#0b0e12",
+        "dragDropEnabled": true
+      }
+    ]
+  },
+  "bundle": {
+    "icon": [
+      "icons-dev/32x32.png",
+      "icons-dev/128x128.png",
+      "icons-dev/128x128@2x.png",
+      "icons-dev/icon.ico"
+    ],
+    "shortDescription": "Nookstacks Dev — the development build",
+    "longDescription": "The development build of Nookstacks. Installs beside the release build, with its own application data, so a half-finished change can never touch a real board."
+  }
+}

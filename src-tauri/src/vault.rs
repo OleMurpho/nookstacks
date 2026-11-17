@@ -170,6 +170,22 @@ fn data_dir() -> PathBuf {
     std::env::temp_dir()
 }
 
+/// Which build this is: "dev" when compiled for the development app, otherwise
+/// "release". bundle-dev.bat sets NOOKSTACKS_FLAVOUR and builds into its own
+/// target directory, so the two never share artefacts.
+///
+/// The development build installs beside the release build and must not touch
+/// its data, so the two keep separate folders. The release build keeps the path
+/// it has always used: moving it would lose every existing board.
+pub const FLAVOUR: &str = match option_env!("NOOKSTACKS_FLAVOUR") {
+    Some(f) => f,
+    None => "release",
+};
+
+fn vault_folder() -> &'static str {
+    if FLAVOUR == "dev" { "Nookstacks Dev" } else { "Nookstacks" }
+}
+
 pub fn vault_dir() -> &'static Path {
     VAULT.get_or_init(|| {
         if let Ok(p) = std::env::var("NOOKSTACKS_VAULT") {
@@ -177,7 +193,7 @@ pub fn vault_dir() -> &'static Path {
                 return PathBuf::from(p);
             }
         }
-        data_dir().join("Nookstacks").join("vault")
+        data_dir().join(vault_folder()).join("vault")
     })
 }
 

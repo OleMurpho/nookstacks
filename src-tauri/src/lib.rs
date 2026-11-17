@@ -24,6 +24,14 @@ struct Saved {
     saved_ms: u64,
 }
 
+/// "dev" for a build made with tauri.dev.conf.json, "release" otherwise. The
+/// identifier is the only thing that differs at compile time, so it is the thing
+/// the interface asks about.
+#[tauri::command]
+fn build_flavour() -> &'static str {
+    vault::FLAVOUR
+}
+
 #[tauri::command]
 fn vault_info() -> StateEnvelope {
     StateEnvelope {
@@ -184,6 +192,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            build_flavour,
             vault_info,
             get_state,
             put_state,

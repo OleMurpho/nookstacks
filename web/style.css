@@ -598,3 +598,20 @@ body.booting #cylinder { visibility: hidden; }
 .updbar i{display:block; height:100%; width:0; background:var(--accent-bright); transition:width .18s linear}
 .updgo{margin-top:8px}
 .updgo[hidden]{display:none}
+
+/* a dev build sits beside the real one, so it says which it is */
+.devpill{
+  font: 600 9px/1 var(--mono, ui-monospace, monospace);
+  letter-spacing: .12em;
+  padding: 4px 7px;
+  border-radius: 5px;
+  color: #b9d2e6;
+  background: rgba(108, 142, 176, .18);
+  border: 1px solid rgba(108, 142, 176, .5);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* the dev build wears the blue-grey of its icon, not the amber of the release */
+.is-dev #menubar .mb-mark{background:#6c8eb0; box-shadow:none}
+.is-dev #stage{--accent:#6c8eb0}
