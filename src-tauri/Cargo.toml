@@ -1,6 +1,6 @@
 [package]
 name = "nookstacks"
-version = "0.2.2"
+version = "0.2.3"
 description = "A tower of project bookshelves"
 authors = ["OleMurpho"]
 edition = "2021"

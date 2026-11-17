@@ -265,6 +265,42 @@ pub fn launch_installer(_installer: &Path) -> Result<(), String> {
     Err("this platform updates from the release page".into())
 }
 
+
+/// Keep a copy of the board before an installer runs.
+///
+/// The updater itself never writes to the vault, and the per-user installer only
+/// replaces program files. Both of those are assumptions, though, and a board is
+/// not something to lose because an assumption stopped being true. This costs a
+/// few kilobytes and makes the worst case recoverable.
+pub fn backup_vault(reason: &str) -> Option<PathBuf> {
+    let vault = crate::vault::vault_dir();
+    let state = vault.join("state.json");
+    if !state.is_file() {
+        return None;
+    }
+    let dir = vault.parent()?.join("backups");
+    fs::create_dir_all(&dir).ok()?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let dest = dir.join(format!("state-{reason}-{stamp}.json"));
+    fs::copy(&state, &dest).ok()?;
+
+    // the newest five are enough to undo a bad week
+    let mut kept: Vec<PathBuf> = fs::read_dir(&dir)
+        .ok()?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().map(|x| x == "json").unwrap_or(false))
+        .collect();
+    kept.sort();
+    while kept.len() > 5 {
+        let old = kept.remove(0);
+        let _ = fs::remove_file(old);
+    }
+    Some(dest)
+}
+
 /// Headless path used by `nookstacks --update-now` and by the release check:
 /// check, download, verify, launch, and report each step to a log file.
 pub fn install_blocking() -> Result<String, String> {
@@ -289,6 +325,10 @@ pub fn install_blocking() -> Result<String, String> {
         }
     })?;
     log_line(&log, &format!("verified sha256, installer at {}", path.display()));
+    match backup_vault(&format!("pre-{}", m.version)) {
+        Some(p) => log_line(&log, &format!("board backed up to {}", p.display())),
+        None => log_line(&log, "no board to back up"),
+    }
     launch_installer(&path)?;
     log_line(&log, "installer started, exiting");
     Ok(format!("installing {}", m.version))
@@ -334,6 +374,7 @@ pub async fn update_install(app: tauri::AppHandle) -> Result<(), String> {
         let path = download(&asset, &|p| {
             let _ = handle.emit("update:progress", p);
         })?;
+        let _ = backup_vault(&format!("pre-{}", m.version));
         launch_installer(&path)?;
         let _ = handle.emit("update:installing", m.version.clone());
         std::thread::sleep(Duration::from_millis(400));

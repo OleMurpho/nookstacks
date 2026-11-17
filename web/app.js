@@ -332,17 +332,17 @@ const TEMPLATES = [
   },
   {
     id: 'zoo', name: 'Everything it opens', tint: 'sky',
-    blurb: 'One card of every kind the app can read: sheets, a notebook, a data tree, a font, an archive, a book, a drawing, a piano roll, a mesh, a diagram, a map.',
+    blurb: 'One card of every kind the app can read: sheets, a notebook, a data tree, a font, an archive, a book, a drawing, a piano roll, a mesh, a diagram, a map, a .drawio and a .stl.',
     build(){
       return {
         groups: [
           tplRegion('SHEETS AND DATA', 20, 60, 1240, 1000, 'amber'),
           tplRegion('DOCUMENTS AND DIAGRAMS', 1220, 60, 1040, 1000, 'sky'),
-          tplRegion('DRAWINGS AND SOUND', 20, 1080, 2220, 600, 'violet'),
-          tplRegion('FILES AND LISTS', 20, 1620, 2220, 940, 'mint')
+          tplRegion('DRAWINGS AND SOUND', 20, 1080, 2220, 1060, 'violet'),
+          tplRegion('FILES AND LISTS', 20, 2200, 2220, 1000, 'mint')
         ],
         docs: [
-          tplDoc('note', 'Every kind of file', 60, 2180, 560, 200,
+          tplDoc('note', 'Every kind of file', 660, 2740, 560, 420,
             { text: '<p>The same board, opened with a viewer for each kind: a sheet grid, a notebook, a tree, a font specimen, an archive listing, subtitles, a calendar, contacts, a book, a drawing, a piano roll, a mesh, a diagram and a map.</p><p>Anything without a viewer keeps the plain file tile and a download link.</p>' }),
 
           tplFile('sheet', 'inventory.xlsx', 'inventory.xlsx', 'xlsx', 60, 100, 560, 440),
@@ -360,11 +360,14 @@ const TEMPLATES = [
           tplFile('ebook', 'field-notes.epub', 'field-notes.epub', 'epub', 1260, 1120, 460, 520),
           tplFile('midi', 'scale.mid', 'scale.mid', 'mid', 1760, 1120, 460, 400),
 
-          tplFile('archive', 'bundle.zip', 'bundle.zip', 'zip', 60, 1660, 560, 460),
-          tplFile('subtitle', 'clip.srt', 'clip.srt', 'srt', 660, 1660, 560, 420),
-          tplFile('calendar', 'schedule.ics', 'schedule.ics', 'ics', 1260, 1660, 460, 420),
-          tplFile('contact', 'team.vcf', 'team.vcf', 'vcf', 1760, 1660, 460, 360),
-          tplFile('geo', 'site.geojson', 'site.geojson', 'geojson', 60, 2410, 560, 460)
+          tplFile('drawio', 'flow.drawio', 'flow.drawio', 'drawio', 60, 1660, 560, 460),
+          tplFile('model', 'example-washer.stl', 'example-washer.stl', 'stl', 660, 1660, 560, 460),
+
+          tplFile('archive', 'bundle.zip', 'bundle.zip', 'zip', 60, 2240, 560, 460),
+          tplFile('subtitle', 'clip.srt', 'clip.srt', 'srt', 660, 2240, 560, 420),
+          tplFile('calendar', 'schedule.ics', 'schedule.ics', 'ics', 1260, 2240, 460, 420),
+          tplFile('contact', 'team.vcf', 'team.vcf', 'vcf', 1760, 2240, 460, 360),
+          tplFile('geo', 'site.geojson', 'site.geojson', 'geojson', 60, 2740, 560, 460)
         ]
       };
     }
@@ -991,7 +994,26 @@ function mimeFor(doc){
   return MIME_BY_EXT[ext] || '';
 }
 
+/* One fetch per file, however many times a card is drawn. Rendering rebuilds
+   every viewer, so without this a board re-reads every file on each pass and a
+   completion that asks for a redraw turns into a fetch loop. */
+const blobCache = new Map();   // doc id -> Blob
+const blobWait = new Map();    // doc id -> promise, so parallel cards share one read
+function forgetBlob(id){ blobCache.delete(id); blobWait.delete(id); }
+
 async function blobFor(doc){
+  if (blobCache.has(doc.id)) return blobCache.get(doc.id);
+  if (blobWait.has(doc.id)) return blobWait.get(doc.id);
+  const p = loadBlob(doc);
+  blobWait.set(doc.id, p);
+  try {
+    const b = await p;
+    if (b) blobCache.set(doc.id, b);
+    return b;
+  } finally { blobWait.delete(doc.id); }
+}
+
+async function loadBlob(doc){
   if (doc.blobId && vault.ok){
     try { const b = await vault.getBlob(doc.blobId, mimeFor(doc)); if (b) return b; } catch {}
   }
@@ -1019,8 +1041,11 @@ async function blobFor(doc){
   return null;
 }
 async function resolveBlobUrl(doc){
+  if (urls.has(doc.id)) return;
   const blob = await blobFor(doc);
   if (!blob) return;
+  // several passes can be waiting on the same file; only the first one redraws
+  if (urls.has(doc.id)) return;
   urls.set(doc.id, URL.createObjectURL(blob));
   if (findDoc(doc.id)) render();
 }
