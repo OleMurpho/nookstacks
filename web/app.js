@@ -53,7 +53,7 @@ const BOOK_EXT  = /\.(epub|fb2)$/i;
 const CAD_EXT   = /\.(dxf)$/i;
 const MIDI_EXT  = /\.(mid|midi)$/i;
 const MESH_EXT  = /\.3mf$/i;
-const DIAG_EXT  = /\.(mmd|mermaid)$/i;
+const DIAG_EXT  = /\.(mmd|mermaid|drawio)$/i;
 const MAP_EXT   = /\.(geojson|gpx|kml)$/i;
 const MODEL_EXT = /\.(glb|gltf|obj|stl|fbx|ply|dae|blend)$/i;
 const IMG_EXT = /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i;
@@ -467,9 +467,11 @@ const vault = {
     return { saved: Date.now() };
   },
 
-  async getBlob(id){
+  async getBlob(id, type){
     if (DESKTOP){
-      try { const buf = await call('get_blob', {id}); return new Blob([buf]); } catch { return null; }
+      // the vault stores bytes, not MIME types: without one the webview refuses
+      // to hand a PDF to its viewer and shows the raw stream instead
+      try { const buf = await call('get_blob', {id}); return new Blob([buf], type ? { type } : undefined); } catch { return null; }
     }
     const r = await fetch('/api/blob/' + encodeURIComponent(id), {cache:'no-store'});
     if (!r.ok) return null;
@@ -968,9 +970,30 @@ function blobFree(){
   if (next){ blobActive++; next(); }
 }
 
+/* What a blob should call itself. Imports carry the type the OS reported; older
+   cards and hand-written boards do not, so the extension decides. */
+const MIME_BY_EXT = {
+  pdf: 'application/pdf',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  webp: 'image/webp', avif: 'image/avif', bmp: 'image/bmp', svg: 'image/svg+xml',
+  mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', m4v: 'video/mp4',
+  mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4',
+  flac: 'audio/flac', opus: 'audio/ogg',
+  stl: 'model/stl', obj: 'model/obj', glb: 'model/gltf-binary', gltf: 'model/gltf+json',
+  ply: 'model/ply', fbx: 'application/octet-stream', dae: 'model/vnd.collada+xml',
+  '3mf': 'model/3mf', zip: 'application/zip', epub: 'application/epub+zip',
+  md: 'text/markdown', txt: 'text/plain', csv: 'text/csv', json: 'application/json'
+};
+function mimeFor(doc){
+  if (!doc) return '';
+  if (doc.mime) return doc.mime;
+  const ext = (doc.ext || (doc.title || '').split('.').pop() || '').toLowerCase();
+  return MIME_BY_EXT[ext] || '';
+}
+
 async function blobFor(doc){
   if (doc.blobId && vault.ok){
-    try { const b = await vault.getBlob(doc.blobId); if (b) return b; } catch {}
+    try { const b = await vault.getBlob(doc.blobId, mimeFor(doc)); if (b) return b; } catch {}
   }
   if (doc.blobId){
     const rec = await idb.get(doc.blobId);
@@ -1838,7 +1861,7 @@ function kindFor(name){
   if (CAD_EXT.test(name)) return 'cad';
   if (MIDI_EXT.test(name)) return 'midi';
   if (MESH_EXT.test(name)) return 'mesh3mf';
-  if (DIAG_EXT.test(name)) return 'diagram';
+  if (DIAG_EXT.test(name)) return /\.drawio$/i.test(name) ? 'drawio' : 'diagram';
   if (ZIP_EXT.test(name) || TAR_EXT.test(name) || GZ_EXT.test(name)) return 'archive';
   if (MODEL_EXT.test(name)) return 'model';
   if (PDF_EXT.test(name)) return 'pdf';
@@ -1873,7 +1896,7 @@ async function addFiles(files, at){
     let text = null;
     if (kind === 'text' || kind === 'notebook') text = await f.text();
     else if (kind === 'data' && f.size < 4 << 20) text = await f.text();
-    const doc = placeDoc({ name:f.name, ext, kind, blobId:id, size:f.size, text }, at);
+    const doc = placeDoc({ name:f.name, ext, kind, blobId:id, size:f.size, mime:f.type || '', text }, at);
     const rec = await idb.get(id);
     if (rec) urls.set(doc.id, URL.createObjectURL(rec.blob));
   }
@@ -2503,10 +2526,11 @@ $('#navNext').onclick = () => goShelf(shelf + 1);
 /* ------------------------------------------------------------ viewer api */
 async function addFileToBoard(name, blob){
   const kind = kindFor(name);
+  const mime = blob.type || '';
   const id = 'b' + Math.random().toString(36).slice(2, 10);
   await storeBlob(id, blob);
   const ext = (name.split('.').pop() || '').toLowerCase();
-  const doc = placeDoc({ name, ext, kind, blobId: id, size: blob.size, text: null });
+  const doc = placeDoc({ name, ext, kind, blobId: id, size: blob.size, mime, text: null });
   urls.set(doc.id, URL.createObjectURL(blob));
   save(); render();
   return doc;

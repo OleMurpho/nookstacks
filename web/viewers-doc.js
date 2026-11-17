@@ -320,6 +320,155 @@
     }
   };
 
+
+  /* ---------------------------------------------------------------- drawio */
+  // draw.io stores a diagram as mxGraphModel XML, either inline or as base64 of
+  // a raw-deflated, percent-encoded copy. Both are accepted; the result is drawn
+  // as boxes and arrows rather than handed to the browser as a download.
+  const inflateRaw = async bytes => {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  };
+
+  async function drawioModel(text){
+    const raw = String(text || '').trim();
+    const diagram = raw.match(/<diagram[^>]*>([\s\S]*?)<\/diagram>/i);
+    let inner = diagram ? diagram[1].trim() : raw;
+    if (inner.startsWith('<')) return new DOMParser().parseFromString(inner, 'application/xml');
+    // compressed: base64 -> raw deflate -> URI-encoded UTF-8
+    const bin = atob(inner.replace(/\s+/g, ''));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const xml = decodeURIComponent(new TextDecoder().decode(await inflateRaw(bytes)));
+    return new DOMParser().parseFromString(xml, 'application/xml');
+  }
+
+  const lum = hex => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return 0.5;
+    const n = parseInt(m[1], 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  };
+
+  V.drawio = {
+    size: [520, 460], badge: 'diagram',
+    html(){ return shell('<div class="vload">reading diagram…</div>'); },
+    async wire(el, doc, api){
+      const wrap = el.querySelector('.vwrap'), stat = el.querySelector('.vstat');
+      try {
+        const blob = await api.blob(doc);
+        if (!blob) throw new Error('no file');
+        const xml = await drawioModel(await blob.text());
+        if (xml.querySelector('parsererror')) throw new Error('this .drawio is not readable XML');
+
+        const nodes = new Map();
+        const shapes = [], links = [];
+        for (const cell of xml.querySelectorAll('mxCell')){
+          const style = cell.getAttribute('style') || '';
+          const value = (cell.getAttribute('value') || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+          const geo = cell.querySelector('mxGeometry');
+          const kind = (style.match(/(?:^|;)shape=([a-z]+)/) || [])[1] || '';
+          const fill = (style.match(/fillColor=(#[0-9a-f]{3,6})/i) || [])[1] || '';
+          const stroke = (style.match(/strokeColor=(#[0-9a-f]{3,6})/i) || [])[1] || '';
+          if (cell.getAttribute('vertex') === '1' && geo){
+            const x = +geo.getAttribute('x') || 0, y = +geo.getAttribute('y') || 0;
+            const w = +geo.getAttribute('width') || 0, h = +geo.getAttribute('height') || 0;
+            if (!w || !h) continue;
+            const node = { x, y, w, h, value, kind, fill, stroke,
+              ellipse: /ellipse/.test(style), rhombus: /rhombus/.test(kind) || /rhombus/.test(style) };
+            shapes.push(node);
+            if (cell.id) nodes.set(cell.id, node);
+          } else if (cell.getAttribute('edge') === '1'){
+            const pts = [...(geo ? geo.querySelectorAll('mxPoint') : [])]
+              .map(pt => ({ x: +pt.getAttribute('x') || 0, y: +pt.getAttribute('y') || 0 }));
+            links.push({ from: cell.getAttribute('source'), to: cell.getAttribute('target'), pts,
+              label: value, dashed: /dashed/.test(style), colour: stroke });
+          }
+        }
+        if (!shapes.length) throw new Error('this diagram has no shapes to draw');
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        shapes.forEach(s => { minX = Math.min(minX, s.x); minY = Math.min(minY, s.y);
+          maxX = Math.max(maxX, s.x + s.w); maxY = Math.max(maxY, s.y + s.h); });
+        links.forEach(l => l.pts.forEach(p => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }));
+
+        const pad = 18;
+        const canvas = document.createElement('canvas');
+        canvas.className = 'drawio';
+        const cw = 1000, ch = 760;
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = cw * dpr; canvas.height = ch * dpr;
+        canvas.style.width = '100%'; canvas.style.height = '100%';
+        wrap.innerHTML = ''; wrap.appendChild(canvas);
+        const g = canvas.getContext('2d');
+        g.scale(dpr, dpr);
+        const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+        const scale = Math.min((cw - pad * 2) / bw, (ch - pad * 2) / bh);
+        const ox = (cw - bw * scale) / 2 - minX * scale, oy = (ch - bh * scale) / 2 - minY * scale;
+        const X = v => v * scale + ox, Y = v => v * scale + oy;
+
+        const centre = s => ({ x: s.x + s.w / 2, y: s.y + s.h / 2 });
+        // links first, so shapes sit on top of their ends
+        g.lineWidth = 1.4; g.strokeStyle = '#8fa6b8'; g.fillStyle = '#8fa6b8';
+        links.forEach(l => {
+          const a = nodes.get(l.from), b = nodes.get(l.to);
+          const start = a ? centre(a) : (l.pts[0] || null);
+          const end = b ? centre(b) : (l.pts[l.pts.length - 1] || null);
+          if (!start || !end) return;
+          const p = [start, ...l.pts.slice(a && b ? 0 : 1), end];
+          g.setLineDash(l.dashed ? [5, 4] : []);
+          g.beginPath(); g.moveTo(X(p[0].x), Y(p[0].y));
+          for (let i = 1; i < p.length; i++) g.lineTo(X(p[i].x), Y(p[i].y));
+          g.stroke();
+          const prev = p[p.length - 2], tip = p[p.length - 1];
+          const ang = Math.atan2(tip.y - prev.y, tip.x - prev.x);
+          const head = 7;
+          g.beginPath();
+          g.moveTo(X(tip.x), Y(tip.y));
+          g.lineTo(X(tip.x) - head * Math.cos(ang - 0.4), Y(tip.y) - head * Math.sin(ang - 0.4));
+          g.lineTo(X(tip.x) - head * Math.cos(ang + 0.4), Y(tip.y) - head * Math.sin(ang + 0.4));
+          g.closePath(); g.fill();
+        });
+        g.setLineDash([]);
+
+        shapes.forEach(s => {
+          const x = X(s.x), y = Y(s.y), w = s.w * scale, h = s.h * scale;
+          const fill = s.fill && s.fill !== 'none' ? s.fill : '#1c222c';
+          g.beginPath();
+          if (s.ellipse) g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+          else if (s.rhombus){ g.moveTo(x + w / 2, y); g.lineTo(x + w, y + h / 2);
+            g.lineTo(x + w / 2, y + h); g.lineTo(x, y + h / 2); g.closePath(); }
+          else g.roundRect(x, y, w, h, Math.min(6, w / 6, h / 6));
+          g.fillStyle = fill; g.globalAlpha = 0.92; g.fill(); g.globalAlpha = 1;
+          g.strokeStyle = s.stroke || '#4a5568'; g.lineWidth = 1.2; g.stroke();
+
+          if (!s.value) return;
+          g.fillStyle = lum(fill) > 0.55 ? '#11151b' : '#e6edf6';
+          const size = Math.max(9, Math.min(14, Math.round(h / 2.6)));
+          g.font = `${size}px ui-sans-serif, system-ui`;
+          g.textAlign = 'center'; g.textBaseline = 'middle';
+          const words = s.value.split(' ');
+          const lines = []; let line = '';
+          for (const word of words){
+            const test = line ? line + ' ' + word : word;
+            if (g.measureText(test).width > w - 10 && line){ lines.push(line); line = word; }
+            else line = test;
+          }
+          if (line) lines.push(line);
+          const lh = size * 1.2;
+          const top = y + h / 2 - ((lines.length - 1) * lh) / 2;
+          lines.slice(0, 4).forEach((t, i) => g.fillText(t, x + w / 2, top + i * lh, w - 8));
+        });
+
+        stat.textContent = `${shapes.length} shape${shapes.length === 1 ? '' : 's'} · ${links.length} link${links.length === 1 ? '' : 's'}`;
+      } catch (err){
+        wrap.innerHTML = `<div class="vload bad">${esc0(err.message || err)}</div>`;
+      }
+    }
+  };
+
   /* ------------------------------------------------------------------- geo */
   function geoFromGeoJSON(o){
     const pts = [], lines = [], polys = [];
