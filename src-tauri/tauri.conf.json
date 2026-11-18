@@ -46,7 +46,7 @@
     "category": "Productivity",
     "shortDescription": "Project bookshelves in an infinite tower",
     "longDescription": "Nookstacks stores your projects as a tower of levels, each level a shelf of boards, each board an infinite canvas of documents you can place, resize and edit in place.",
-    "copyright": "MIT licensed",
+    "copyright": "Copyright (C) 2026 Murphy M. Lopes — GPL-3.0-or-later",
     "publisher": "OleMurpho",
     "homepage": "https://github.com/OleMurpho/nookstacks",
     "linux": {
