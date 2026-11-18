@@ -3366,7 +3366,7 @@ function showAbout(){
     <p><b>Nookstacks</b> — a tower of project bookshelves. Every category is a level, every project a shelf,
     every shelf an infinite board.</p>
     <p>Local only: no account, no sync service, no telemetry. Your board is a folder you own.</p>
-    <p class="ver">version ${APP_VERSION} · MIT licence</p></div>`);
+    <p class="ver">version ${APP_VERSION} · GPL-3.0-or-later · <a href="https://github.com/OleMurpho/nookstacks" target="_blank" rel="noopener">source</a></p></div>`);
 }
 
 /* ---- the menu itself -------------------------------------------------- */

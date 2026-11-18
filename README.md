@@ -142,4 +142,19 @@ Set `NOOKSTACKS_VAULT` to keep it somewhere else, like a synced folder.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GNU General Public License v3.0 or later. The full text is in [LICENSE](LICENSE);
+the SPDX identifier is `GPL-3.0-or-later`.
+
+In plain terms: you can run it, study it, change it and share it. If you
+distribute a changed version — as an app, an installer or a hosted service —
+you have to publish the source of your version under the same licence. Selling
+it is allowed; closing it is not.
+
+Releases published before this change (0.2.3 and earlier) went out under MIT and
+stay under MIT; their archived installers are unaffected. Everything in this
+repository from now on is GPLv3.
+
+An installer is a binary, and the GPL wants the matching source beside it. For
+any release, that is the repository at the tag it was built from
+(`git checkout v0.4.0`), including the vendored libraries under `web/vendor/`,
+which keep their own permissive licences (MIT) and are compatible with this one.
